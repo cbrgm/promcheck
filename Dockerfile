@@ -1,5 +1,5 @@
 # Builder
-FROM golang:1.16.6-alpine3.14 AS build
+FROM golang:1.17.8-alpine3.14 AS build
 
 WORKDIR /promcheck
 
