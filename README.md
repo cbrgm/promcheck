@@ -1,0 +1,307 @@
+# promcheck
+**A tool to identify faulty [Prometheus](https://prometheus.io/) rules**
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/cbrgm/promcheck?)](https://goreportcard.com/report/github.com/cbrgm/promcheck)
+[![release](https://img.shields.io/github/release-pre/cbrgm/promcheck.svg)](https://github.com/cbrgm/promcheck/releases)
+[![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/cbrgm/promcheck/blob/master/LICENSE)
+![GitHub stars](https://img.shields.io/github/stars/cbrgm/promcheck.svg?label=github%20stars)
+[![Releases](https://img.shields.io/github/downloads/cbrgm/promcheck/total.svg)]()
+
+## About
+
+**Promcheck supports you to identify recording or alerting rules using missing metrics or wrong label matchers** (e.g. because of exporter changes or human-errors).
+
+Promcheck probes Prometheus [vector selectors](https://prometheus.io/docs/prometheus/latest/querying/basics/) and checks
+if they return a result value or not. As a basis for validation, Promcheck uses Prometheus rule files, scans the PromQL expressions of each
+individual [recording](https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/)
+and [alerting](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) rule, takes the individual
+referenced selectors out of it and probes them against a Prometheus instance.
+
+
+<div align="center">
+<br>
+<img src="https://github.com/cbrgm/promcheck/blob/main/.img/demo.gif" width="70%">
+<br>
+</div>
+
+Keep in mind that Promcheck may also contain **false positives**, since there may be vector selectors in rules that intentionally do not return a result value.
+
+## Installation
+
+Promcheck is available on Linux, OSX and Windows platforms. Binaries for Linux, Windows and Mac are available as
+tarballs in the [release](https://github.com/cbrgm/promcheck/releases) page.
+
+You may also build promcheck from source (using Go 1.17+). In order to build Promcheck from source you must:
+
+* Clone this repository
+* Run `make install`
+
+## Basic Usage
+
+```bash
+promcheck --prometheus.url="http://0.0.0.0:9090" --check.file=STRING
+```
+
+Argument Reference:
+
+* `--prometheus.url` - The Prometheus instance to probe selectors against
+* `--check.file` - The Prometheus rule file(s) to validate
+
+<details>
+  <summary>Rule group files can be passed in various ways. Click to expand!</summary>
+
+```bash
+# validate a rules file `rules.yaml`
+promcheck --prometheus.url="http://0.0.0.0:9090" \
+          --check.file=rules.yaml
+          
+# validate two rules files `rules-foo.yaml` and `rules-bar.yaml`
+promcheck --prometheus.url="http://0.0.0.0:9090" \
+          --check.file=rules-foo.yaml \
+          --check.file=rules-bar.yaml
+
+# validate all *.yaml files in directory ./config
+promcheck --prometheus.url="http://0.0.0.0:9090" \
+          --check.file='./config/*.yaml'
+```
+
+</details>
+
+### Configuration
+
+For a full list of flags, please also use `promcheck --help`.
+
+```bash
+Flags:
+  -h, --help                                               Show context-sensitive help.
+      --prometheus.url="http://0.0.0.0:9090"               The Prometheus base url
+      --check.ignore-selector=CHECK.IGNORE-SELECTOR,...    Regexp of selectors to ignore
+      --check.ignore-group=CHECK.IGNORE-GROUP,...          Regexp of rule groups to ignore
+      --check.delay=0.1                                    Delay in seconds between probe requests
+      --check.file=STRING                                  The rule files to check.
+      --output.format="graph"                              The output format to use
+      --output.no-color                                    Toggle colored output
+      --log.json                                           Tell promcheck to log json and not key value pairs
+      --log.level="info"                                   The log level to use for filtering logs
+```
+
+Promcheck uses 256 colors terminal mode. On 'nix OS system make sure the `TERM` environment variable is set.
+
+```
+export TERM=xterm-256color
+```
+
+> Note: Promcheck does a single HTTP request per vector selector to be probed against the remote Prometheus instance. With many rules to validate, execution time can take longer and lead to many HTTP requests. The interval between probes can be changed with the `--check.delay` flag, which results in fewer requests but increases the runtime of the tool.
+
+
+### Output formats
+
+Right now, the following output formats are supported:
+
+* `--output.format=graph` - Text format, colored or non-colored (`--output.no-color`) (Default)
+* `--output.format=json` - JSON format
+* `--output.format=yaml` - YAML format
+
+There might be more formats in near future. Feel free to contribute!
+
+### Container Usage
+
+Promcheck can also be executed from within a container. The latest container image of Promcheck is hosted on [quay.io](https://quay.io/repository/cbrgm/promcheck).
+To run Promcheck from within a container (assuming that there is a rule file named `rules.yaml` in the current directory), run:
+
+```
+docker run -v $(pwd):/tmp --rm quay.io/cbrgm/promcheck:latest --check.file="/tmp/rules.yaml"
+```
+
+### Kubernetes Cronjob
+
+Promcheck can be executed as a [Kubernetes CronJob](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/) resource to validate a set of rules on a regular basis.
+Please refer to the `kubernetes.yaml` file for a basic deployment example.
+
+### Examples
+
+Please refer below for some basic usage examples demonstrating what Promcheck can do for you!
+
+#### Basic Example validating multiple rule groups
+
+**Input:**
+<details>
+  <summary>rules.yaml (Click to expand!)</summary>
+
+```yaml
+"groups":
+  - "name": "kubernetes-apps-demo-group"
+    "rules":
+      - "alert": "KubePodCrashLooping"
+        "annotations":
+          "description": "Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) is in waiting state (reason: \"CrashLoopBackOff\")."
+          "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepodcrashlooping"
+          "summary": "Pod is crash looping."
+        "expr": |
+          max_over_time(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff", job="kube-state-metrics"}[5m]) >= 1
+        "for": "15m"
+        "labels":
+          "severity": "warning"
+      - "alert": "KubePodNotReady"
+        "annotations":
+          "description": "Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in a non-ready state for longer than 15 minutes."
+          "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepodnotready"
+          "summary": "Pod has been in a non-ready state for more than 15 minutes."
+        "expr": |
+          sum by (namespace, pod) (
+            max by(namespace, pod) (
+              kube_pod_status_phase{job="kube-state-metrics", phase=~"Pending|Unknown"}
+            ) * on(namespace, pod) group_left(owner_kind) topk by(namespace, pod) (
+              1, max by(namespace, pod, owner_kind) (kube_pod_owner{owner_kind!="Job"})
+            )
+          ) > 0
+        "for": "15m"
+        "labels":
+          "severity": "warning"
+  - "name": "kubernetes-system-scheduler-demo-group"
+    "rules":
+      - "alert": "KubeSchedulerDown"
+        "annotations":
+          "description": "KubeScheduler has disappeared from Prometheus target discovery."
+          "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeschedulerdown"
+          "summary": "Target disappeared from Prometheus target discovery."
+        "expr": |
+          absent(up{job="kube-scheduler"} == 1)
+        "for": "15m"
+        "labels":
+          "severity": "critical"
+  - "name": "kubernetes-system-controller-manager-demo-group"
+    "rules":
+      - "alert": "KubeControllerManagerDown"
+        "annotations":
+          "description": "KubeControllerManager has disappeared from Prometheus target discovery."
+          "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecontrollermanagerdown"
+          "summary": "Target disappeared from Prometheus target discovery."
+        "expr": |
+          absent(up{job="kube-controller-manager"} == 1)
+        "for": "15m"
+        "labels":
+          "severity": "critical"
+
+```
+
+</details>
+
+**Command**:
+```bash
+➜ ./promcheck --check.file 'rules.yaml' --prometheus.url 0.0.0.0:9090
+```
+
+* Prometheus instance running locally on `0.0.0.0:9090`
+
+**Output**:
+```
+.
+└── [file] examples/rules_multiple_groups.yaml
+    ├── [group] kubernetes-apps-demo-group
+    │   ├── [0/1] KubePodCrashLooping
+    │   │   └── [✖] kube_pod_container_status_waiting_reason{job="kube-state-metrics",reason="CrashLoopBackOff"}
+    │   └── [2/2] KubePodNotReady
+    │       ├── [✔] kube_pod_status_phase{job="kube-state-metrics",phase=~"Pending|Unknown"}
+    │       └── [✔] kube_pod_owner{owner_kind!="Job"}
+    ├── [group] kubernetes-system-scheduler-demo-group
+    │   └── [1/1] KubeSchedulerDown
+    │       └── [✔] up{job="kube-scheduler"}
+    └── [group] kubernetes-system-controller-manager-demo-group
+        └── [1/1] KubeControllerManagerDown
+            └── [✔] up{job="kube-controller-manager"}
+
+Rules validated total: 4
+Selectors total: 5, Results found: 4, No Results found 1 (Failed/Total: 20.00%)
+```
+
+**Command**:
+
+Ignore rule group `kubernetes-system-controller-manager-demo-group`
+```bash
+➜ ./promcheck --check.file 'rules.yaml' \
+              --check.ignore-group 'kubernetes-system-controller-manager-demo-group' \
+              --prometheus.url 0.0.0.0:9090
+```
+
+* Prometheus instance running locally on `0.0.0.0:9090`
+
+**Output**:
+```
+.
+└── [file] examples/rules_multiple_groups.yaml
+    ├── [group] kubernetes-apps-demo-group
+    │   ├── [2/2] KubePodNotReady
+    │   │   ├── [✔] kube_pod_status_phase{job="kube-state-metrics",phase=~"Pending|Unknown"}
+    │   │   └── [✔] kube_pod_owner{owner_kind!="Job"}
+    │   └── [0/1] KubePodCrashLooping
+    │       └── [✖] kube_pod_container_status_waiting_reason{job="kube-state-metrics",reason="CrashLoopBackOff"}
+    └── [group] kubernetes-system-scheduler-demo-group
+        └── [1/1] KubeSchedulerDown
+            └── [✔] up{job="kube-scheduler"}
+
+Rules validated total: 4
+Selectors total: 4, Results found: 3, No Results found 1 (Failed/Total: 25.00%)
+```
+
+**Command**:
+
+Output json:
+```bash
+➜ ./promcheck --check.file 'rules.yaml' \
+              --check.ignore-group 'kubernetes-system-controller-manager-demo-group' \
+              --prometheus.url 0.0.0.0:9090
+              --output.format json
+```
+
+**Output**:
+```json
+{
+  "promcheck": {
+    "results": [
+      {
+        "file": "examples/rules_multiple_groups.yaml",
+        "group": "kubernetes-apps-demo-group",
+        "name": "KubePodCrashLooping",
+        "expression": "max_over_time(kube_pod_container_status_waiting_reason{reason=\"CrashLoopBackOff\", job=\"kube-state-metrics\"}[5m]) \u003e= 1\n",
+        "no_results": [
+          "kube_pod_container_status_waiting_reason{job=\"kube-state-metrics\",reason=\"CrashLoopBackOff\"}"
+        ],
+        "results": []
+      },
+      {
+        "file": "examples/rules_multiple_groups.yaml",
+        "group": "kubernetes-apps-demo-group",
+        "name": "KubePodNotReady",
+        "expression": "sum by (namespace, pod) (\n  max by(namespace, pod) (\n    kube_pod_status_phase{job=\"kube-state-metrics\", phase=~\"Pending|Unknown\"}\n  ) * on(namespace, pod) group_left(owner_kind) topk by(namespace, pod) (\n    1, max by(namespace, pod, owner_kind) (kube_pod_owner{owner_kind!=\"Job\"})\n  )\n) \u003e 0\n",
+        "no_results": [],
+        "results": [
+          "kube_pod_status_phase{job=\"kube-state-metrics\",phase=~\"Pending|Unknown\"}",
+          "kube_pod_owner{owner_kind!=\"Job\"}"
+        ]
+      },
+      {
+        "file": "examples/rules_multiple_groups.yaml",
+        "group": "kubernetes-system-scheduler-demo-group",
+        "name": "KubeSchedulerDown",
+        "expression": "absent(up{job=\"kube-scheduler\"} == 1)\n",
+        "no_results": [],
+        "results": [
+          "up{job=\"kube-scheduler\"}"
+        ]
+      }
+    ],
+    "rules_warnings": 3,
+    "rules_total": 4,
+    "selectors_success_total": 1,
+    "selectors_failed_total": 3,
+    "ratio_failed_total": 25
+  }
+}
+```
+
+## Contributing & License
+
+Feel free to submit changes! See
+the [Contributing Guide](https://github.com/cbrgm/contributing/blob/master/CONTRIBUTING.md). This project is open-source
+and is developed under the terms of the [Apache 2.0 License](https://github.com/cbrgm/promcheck/blob/master/LICENSE).
