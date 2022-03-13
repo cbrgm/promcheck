@@ -1,11 +1,10 @@
-# promcheck
+# promcheck ✔️
 **A tool to identify faulty [Prometheus](https://prometheus.io/) rules**
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/cbrgm/promcheck?)](https://goreportcard.com/report/github.com/cbrgm/promcheck)
 [![release](https://img.shields.io/github/release-pre/cbrgm/promcheck.svg)](https://github.com/cbrgm/promcheck/releases)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/cbrgm/promcheck/blob/master/LICENSE)
 ![GitHub stars](https://img.shields.io/github/stars/cbrgm/promcheck.svg?label=github%20stars)
-[![Releases](https://img.shields.io/github/downloads/cbrgm/promcheck/total.svg)]()
 
 ## About
 
