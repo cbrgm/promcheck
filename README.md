@@ -18,7 +18,7 @@ referenced selectors out of it and probes them against a Prometheus instance.
 
 <div align="center">
 <br>
-<img src="https://github.com/cbrgm/promcheck/blob/main/.img/demo.gif" width="70%">
+<img src="https://github.com/cbrgm/promcheck/blob/main/.img/demo.gif" width="85%">
 <br>
 </div>
 
