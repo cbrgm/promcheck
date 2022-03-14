@@ -187,10 +187,10 @@ Please refer below for some basic usage examples demonstrating what Promcheck ca
 
 **Command**:
 ```bash
-➜ ./promcheck --check.file 'rules.yaml' --prometheus.url 0.0.0.0:9090
+➜ ./promcheck --check.file 'rules.yaml' --prometheus.url http://0.0.0.0:9090
 ```
 
-* Prometheus instance running locally on `0.0.0.0:9090`
+* Prometheus instance running locally on `http://0.0.0.0:9090`
 
 **Output**:
 ```
@@ -219,10 +219,10 @@ Ignore rule group `kubernetes-system-controller-manager-demo-group`
 ```bash
 ➜ ./promcheck --check.file 'rules.yaml' \
               --check.ignore-group 'kubernetes-system-controller-manager-demo-group' \
-              --prometheus.url 0.0.0.0:9090
+              --prometheus.url http://0.0.0.0:9090
 ```
 
-* Prometheus instance running locally on `0.0.0.0:9090`
+* Prometheus instance running locally on `http://0.0.0.0:9090`
 
 **Output**:
 ```
@@ -248,7 +248,7 @@ Output json:
 ```bash
 ➜ ./promcheck --check.file 'rules.yaml' \
               --check.ignore-group 'kubernetes-system-controller-manager-demo-group' \
-              --prometheus.url 0.0.0.0:9090
+              --prometheus.url http://0.0.0.0:9090
               --output.format json
 ```
 
