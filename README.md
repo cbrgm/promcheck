@@ -1,7 +1,7 @@
 # promcheck ✔️
 **A tool to identify faulty [Prometheus](https://prometheus.io/) rules**
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/cbrgm/promcheck?)](https://goreportcard.com/report/github.com/cbrgm/promcheck)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cbrgm/promcheck)](https://goreportcard.com/report/github.com/cbrgm/promcheck)
 [![release](https://img.shields.io/github/release-pre/cbrgm/promcheck.svg)](https://github.com/cbrgm/promcheck/releases)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/cbrgm/promcheck/blob/master/LICENSE)
 ![GitHub stars](https://img.shields.io/github/stars/cbrgm/promcheck.svg?label=github%20stars)
@@ -11,8 +11,7 @@
 **Promcheck supports you to identify recording or alerting rules using missing metrics or wrong label matchers** (e.g. because of exporter changes or human-errors).
 
 Promcheck probes Prometheus [vector selectors](https://prometheus.io/docs/prometheus/latest/querying/basics/) and checks
-if they return a result value or not. As a basis for validation, Promcheck uses Prometheus rule files, scans the PromQL expressions of each
-individual [recording](https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/)
+if they return a result value or not. As a basis for validation, Promcheck uses Prometheus rule files, scans the PromQL expressions of each [recording](https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/)
 and [alerting](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) rule, takes the individual
 referenced selectors out of it and probes them against a Prometheus instance.
 
@@ -86,7 +85,7 @@ Flags:
 
 Promcheck uses 256 colors terminal mode. On 'nix OS system make sure the `TERM` environment variable is set.
 
-```
+```bash
 export TERM=xterm-256color
 ```
 
@@ -108,7 +107,7 @@ There might be more formats in near future. Feel free to contribute!
 Promcheck can also be executed from within a container. The latest container image of Promcheck is hosted on [quay.io](https://quay.io/repository/cbrgm/promcheck).
 To run Promcheck from within a container (assuming that there is a rule file named `rules.yaml` in the current directory), run:
 
-```
+```bash
 docker run -v $(pwd):/tmp --rm quay.io/cbrgm/promcheck:latest --check.file="/tmp/rules.yaml"
 ```
 
@@ -188,10 +187,10 @@ Please refer below for some basic usage examples demonstrating what Promcheck ca
 
 **Command**:
 ```bash
-➜ ./promcheck --check.file 'rules.yaml' --prometheus.url 0.0.0.0:9090
+➜ ./promcheck --check.file 'rules.yaml' --prometheus.url http://0.0.0.0:9090
 ```
 
-* Prometheus instance running locally on `0.0.0.0:9090`
+* Prometheus instance running locally on `http://0.0.0.0:9090`
 
 **Output**:
 ```
@@ -220,10 +219,10 @@ Ignore rule group `kubernetes-system-controller-manager-demo-group`
 ```bash
 ➜ ./promcheck --check.file 'rules.yaml' \
               --check.ignore-group 'kubernetes-system-controller-manager-demo-group' \
-              --prometheus.url 0.0.0.0:9090
+              --prometheus.url http://0.0.0.0:9090
 ```
 
-* Prometheus instance running locally on `0.0.0.0:9090`
+* Prometheus instance running locally on `http://0.0.0.0:9090`
 
 **Output**:
 ```
@@ -249,7 +248,7 @@ Output json:
 ```bash
 ➜ ./promcheck --check.file 'rules.yaml' \
               --check.ignore-group 'kubernetes-system-controller-manager-demo-group' \
-              --prometheus.url 0.0.0.0:9090
+              --prometheus.url http://0.0.0.0:9090
               --output.format json
 ```
 
@@ -292,8 +291,8 @@ Output json:
     ],
     "rules_warnings": 3,
     "rules_total": 4,
-    "selectors_success_total": 1,
-    "selectors_failed_total": 3,
+    "selectors_success_total": 3,
+    "selectors_failed_total": 1,
     "ratio_failed_total": 25
   }
 }

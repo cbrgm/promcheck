@@ -2,11 +2,12 @@ package promcheck
 
 import (
 	"fmt"
+	"regexp"
+	"time"
+
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/model/rulefmt"
 	promql "github.com/prometheus/prometheus/promql/parser"
-	"regexp"
-	"time"
 )
 
 // Probe represents probe

@@ -1,10 +1,11 @@
 package promcheck
 
 import (
-	"github.com/prometheus/prometheus/model/rulefmt"
-	promql "github.com/prometheus/prometheus/promql/parser"
 	"reflect"
 	"testing"
+
+	"github.com/prometheus/prometheus/model/rulefmt"
+	promql "github.com/prometheus/prometheus/promql/parser"
 )
 
 func TestPrometheusRulesChecker_CheckRuleGroups(t *testing.T) {

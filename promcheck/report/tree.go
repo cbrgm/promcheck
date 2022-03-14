@@ -2,8 +2,9 @@ package report
 
 import (
 	"fmt"
-	"github.com/fatih/color"
 	"strings"
+
+	"github.com/fatih/color"
 )
 
 const (
@@ -81,7 +82,6 @@ func (p *treePrinter) printTree(t Tree) string {
 	return t.String() + newLine + p.printNodes(t.Nodes(), []bool{})
 }
 
-
 func (p *treePrinter) printText(text string, spaces []bool, last bool) string {
 	var result string
 	for _, space := range spaces {
@@ -129,6 +129,7 @@ func (p *treePrinter) printNodes(t []Tree, spaces []bool) string {
 	return result
 }
 
+// ToTree returns the report as a tree structure in text format
 func (b *Builder) ToTree() (string, error) {
 	b.finalize()
 	// translate slice of Sections into a map structure

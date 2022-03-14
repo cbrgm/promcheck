@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// HTTPClient represents http client
 type HTTPClient interface {
 	Do(*http.Request) (*http.Response, error)
 }

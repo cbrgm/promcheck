@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/alecthomas/kong"
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"os"
 	"runtime"
 	"time"
+
+	"github.com/alecthomas/kong"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 )
 
 const (
