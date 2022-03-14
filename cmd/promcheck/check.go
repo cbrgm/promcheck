@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
+	"time"
+
 	"github.com/cbrgm/promcheck/promcheck"
 	"github.com/cbrgm/promcheck/promcheck/report"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/prometheus/model/rulefmt"
-	"path/filepath"
-	"time"
 )
 
 func checkRulesFromRuleFiles(config *config, logger log.Logger) error {

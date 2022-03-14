@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/fatih/color"
-	"gopkg.in/yaml.v3"
 	"io"
 	"os"
+
+	"github.com/fatih/color"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -61,10 +62,10 @@ type Report struct {
 	TotalRules int `json:"rules_total,omitempty" yaml:"rules_total,omitempty"`
 
 	// TotalSelectorsFailed represents the total amount of probed selectors not containing a result value
-	TotalSelectorsFailed int `json:"selectors_success_total,omitempty" yaml:"selectors_success_total,omitempty"`
+	TotalSelectorsFailed int `json:"selectors_failed_total,omitempty" yaml:"selectors_failed_total,omitempty"`
 
 	// TotalSelectorsSuccess represents the total amount of probed selectors containing a result value
-	TotalSelectorsSuccess int `json:"selectors_failed_total,omitempty" yaml:"selectors_failed_total,omitempty"`
+	TotalSelectorsSuccess int `json:"selectors_success_total,omitempty" yaml:"selectors_success_total,omitempty"`
 
 	// RatioFailedTotal represents the ratio of selectors without a result value / total amount of selectors
 	RatioFailedTotal float32 `json:"ratio_failed_total,omitempty" yaml:"ratio_failed_total,omitempty"`
@@ -110,6 +111,7 @@ func (b *Builder) finalize() {
 	b.Report.RatioFailedTotal = (float32(b.Report.TotalSelectorsFailed) / float32(totalSelectors)) * 100
 }
 
+// AddSection adds a new section to the report
 func (b *Builder) AddSection(file, group, name, expression string, failed []string, success []string) {
 	b.Report.Sections = append(b.Report.Sections, Section{
 		File:       file,
@@ -124,10 +126,13 @@ func (b *Builder) AddSection(file, group, name, expression string, failed []stri
 	b.Report.TotalSelectorsSuccess += len(success)
 }
 
+// AddTotalCheckedRules adds checked rules to the total amount
+// TotalRules is used for report metrics
 func (b *Builder) AddTotalCheckedRules(count int) {
 	b.Report.TotalRules += count
 }
 
+// ToYAML returns the report in yaml format
 func (b *Builder) ToYAML() (string, error) {
 	b.finalize()
 	raw, err := yaml.Marshal(b)
@@ -138,6 +143,7 @@ func (b *Builder) ToYAML() (string, error) {
 	return string(raw), nil
 }
 
+// ToJSON returns the report in json format
 func (b *Builder) ToJSON() (string, error) {
 	b.finalize()
 	raw, err := json.MarshalIndent(b, "", "  ")
@@ -148,6 +154,7 @@ func (b *Builder) ToJSON() (string, error) {
 	return string(raw), nil
 }
 
+// Dump prints the report to the builder's output target in the desired format
 func (b *Builder) Dump() error {
 	if !b.HasContent() {
 		return errors.New("nothing to report")
@@ -166,6 +173,7 @@ func (b *Builder) Dump() error {
 	return err
 }
 
+// DumpYAML prints the report to the builder's output target in yaml format
 func (b *Builder) DumpYAML() error {
 	res, err := b.ToYAML()
 	if err != nil {
@@ -175,6 +183,7 @@ func (b *Builder) DumpYAML() error {
 	return nil
 }
 
+// DumpJSON prints the report to the builder's output target in json format
 func (b *Builder) DumpJSON() error {
 	res, err := b.ToJSON()
 	if err != nil {
@@ -184,6 +193,7 @@ func (b *Builder) DumpJSON() error {
 	return nil
 }
 
+// DumpTree prints the report to the builder's output target in text format
 func (b *Builder) DumpTree() error {
 	res, err := b.ToTree()
 	if err != nil {
