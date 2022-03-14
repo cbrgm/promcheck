@@ -2,6 +2,7 @@ package promcheck
 
 import (
 	"fmt"
+	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"regexp"
 	"time"
 
@@ -9,12 +10,6 @@ import (
 	"github.com/prometheus/prometheus/model/rulefmt"
 	promql "github.com/prometheus/prometheus/promql/parser"
 )
-
-// Probe represents probe
-type Probe interface {
-	// ProbeSelector probes the given PromQL selector against a remote instance.
-	ProbeSelector(selector string) (uint64, error)
-}
 
 // PrometheusRulesCheckerConfig represents PrometheusRulesChecker configuration.
 type PrometheusRulesCheckerConfig struct {
@@ -32,16 +27,12 @@ type PrometheusRulesCheckerConfig struct {
 	// IgnoredGroupsRegexp represents a list of ignored group regexp
 	// This parameter can be used to exclude groups and therefore a set of selectors from probes
 	IgnoredGroupsRegexp []string
-
-	// Probe implements prober
-	// This parameter can be used to set custom probe logic or set a probe mock for testing.
-	Probe Probe
 }
 
 // PrometheusRulesChecker represents linting PromQL logic.
 type PrometheusRulesChecker struct {
-	// probe implements Probe
-	probe Probe
+	// probe implements Prober
+	probe Prober
 
 	// options
 	ignoredSelectorsRegexp []string
@@ -70,21 +61,16 @@ type CheckResult struct {
 }
 
 //NewPrometheusRulesChecker returns PrometheusRulesChecker
-func NewPrometheusRulesChecker(config PrometheusRulesCheckerConfig) *PrometheusRulesChecker {
-	var probe Probe
-	if config.Probe == nil {
-		probe = newPrometheusProbe(
+func NewPrometheusRulesChecker(config PrometheusRulesCheckerConfig, client prometheusv1.API) *PrometheusRulesChecker {
+	return &PrometheusRulesChecker{
+		probe: newPrometheusProbe(
 			config.ProbeDelay,
 			config.PrometheusUrl,
-			defaultHTTPClient,
-		)
-	}
-	prc := &PrometheusRulesChecker{
-		probe:                  probe,
+			client,
+		),
 		ignoredSelectorsRegexp: config.IgnoredSelectorsRegexp,
 		ignoredGroupsRegexp:    config.IgnoredGroupsRegexp,
 	}
-	return prc
 }
 
 // CheckRuleGroups checks Prometheus rule groups.

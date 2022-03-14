@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/prometheus/client_golang/api"
+	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"path/filepath"
 	"time"
 
@@ -19,6 +21,29 @@ func checkRulesFromRuleFiles(config *config, logger log.Logger) error {
 		ignoredSelectors = config.CheckIgnoredSelectorsRegexp
 		ignoredGroups    = config.CheckIgnoredGroupsRegexp
 		filePaths        = config.CheckFiles
+		outputFormat     = config.OutputFormat
+		outputNoColor    = config.OutputNoColor
+	)
+
+	client, err := api.NewClient(api.Config{Address: prometheusUrl})
+	if err != nil {
+		level.Error(logger).Log("msg", "failed to create Prometheus client", "err", err)
+		return err
+	}
+
+	checker := promcheck.NewPrometheusRulesChecker(
+		promcheck.PrometheusRulesCheckerConfig{
+			ProbeDelay:             delay,
+			PrometheusUrl:          prometheusUrl,
+			IgnoredSelectorsRegexp: ignoredSelectors,
+			IgnoredGroupsRegexp:    ignoredGroups,
+		},
+		prometheusv1.NewAPI(client),
+	)
+
+	builder := report.NewBuilder(
+		outputFormat,
+		outputNoColor,
 	)
 
 	matches, err := filepath.Glob(fmt.Sprintf("%s", filePaths))
@@ -37,20 +62,6 @@ func checkRulesFromRuleFiles(config *config, logger log.Logger) error {
 		filesToCheck = append(filesToCheck, fileToCheck)
 	}
 
-	checker := promcheck.NewPrometheusRulesChecker(
-		promcheck.PrometheusRulesCheckerConfig{
-			ProbeDelay:             delay,
-			PrometheusUrl:          prometheusUrl,
-			IgnoredSelectorsRegexp: ignoredSelectors,
-			IgnoredGroupsRegexp:    ignoredGroups,
-		},
-	)
-
-	builder := report.NewBuilder(
-		config.OutputFormat,
-		config.OutputNoColor,
-	)
-
 	res := []promcheck.CheckResult{}
 	for _, file := range filesToCheck {
 		checked, err := checker.CheckRuleGroups(file.File, file.groups)
@@ -63,10 +74,10 @@ func checkRulesFromRuleFiles(config *config, logger log.Logger) error {
 
 		// count checked rules
 		for _, group := range file.groups {
+			builder.AddTotalCheckedGroups(1)
 			builder.AddTotalCheckedRules(len(group.Rules))
 		}
 	}
-
 	for _, cr := range res {
 		builder.AddSection(
 			cr.File,

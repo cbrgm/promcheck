@@ -1,104 +1,57 @@
 package promcheck
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"io/ioutil"
-	"net"
-	"net/http"
-	"runtime"
-	"strconv"
+	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
 	"time"
 )
 
-// HTTPClient represents http client
-type HTTPClient interface {
-	Do(*http.Request) (*http.Response, error)
+// Prober represents probe
+type Prober interface {
+	// ProbeSelector probes the given PromQL selector against a remote instance.
+	ProbeSelector(selector string) (float64, error)
 }
 
-var defaultHTTPClient HTTPClient = newDefaultHTTPClient()
-
 type prometheusProbe struct {
-	client        HTTPClient
+	api           prometheusv1.API
 	delay         time.Duration
 	prometheusUrl string
 }
 
-func newPrometheusProbe(delay time.Duration, prometheusUrl string, client HTTPClient) Probe {
-	if client == nil {
-		client = defaultHTTPClient
-	}
+func newPrometheusProbe(delay time.Duration, prometheusUrl string, client prometheusv1.API) Prober {
 	return &prometheusProbe{
-		client:        client,
+		api:           client,
 		delay:         delay,
 		prometheusUrl: prometheusUrl,
 	}
 }
 
-func (p *prometheusProbe) ProbeSelector(selector string) (uint64, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/query", p.prometheusUrl), nil)
+func (p *prometheusProbe) probe(selector string) (float64, error) {
+	query := fmt.Sprintf("count(%s)", selector)
+	value, _, err := p.api.Query(context.TODO(), query, time.Now())
 	if err != nil {
-		return 0, fmt.Errorf("query request failed: %s", err)
+		return 0, fmt.Errorf("failed to query metrics: %w", err)
 	}
-	count := fmt.Sprintf("count(%s)", selector)
-	q := req.URL.Query()
-	q.Add("query", count)
-	req.URL.RawQuery = q.Encode()
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return 0, fmt.Errorf("rule request failed: %s", err)
-	}
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return 0, fmt.Errorf("failed to read response body: %s", err)
-	}
-
-	payload := struct {
-		Status string
-		Data   struct {
-			Result []struct {
-				Metric map[string]string
-				Value  []interface{}
-			}
+	vec := value.(model.Vector)
+	var metricValue float64
+	for _, v := range vec {
+		if v.Value.String() == "NaN" {
+			metricValue = 0
+		} else {
+			metricValue = float64(v.Value)
 		}
-	}{}
-	err = json.Unmarshal(b, &payload)
-	if err != nil {
-		return 0, fmt.Errorf("failed to unmarshal json: %s", err)
 	}
-
-	if payload.Status != "success" {
-		return 0, fmt.Errorf("status in rule response was not != success: was %s", payload.Status)
-	}
-
-	if len(payload.Data.Result) != 1 {
-		return 0, nil
-	}
-
-	i, err := strconv.ParseUint(payload.Data.Result[0].Value[1].(string), 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse int: %s", err)
-	}
-
-	time.Sleep(p.delay)
-
-	return i, nil
+	return metricValue, nil
 }
 
-func newDefaultHTTPClient() *http.Client {
-	return &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
-			MaxIdleConns:          10,
-			IdleConnTimeout:       60 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-			MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
-		},
+// ProbeSelector implements Prober
+func (p *prometheusProbe) ProbeSelector(selector string) (float64, error) {
+	v, err := p.probe(selector)
+	if err != nil {
+		return 0, err
 	}
+	time.Sleep(p.delay)
+	return v, nil
 }

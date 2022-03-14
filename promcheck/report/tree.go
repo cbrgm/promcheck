@@ -218,7 +218,7 @@ func (b *Builder) ToTree() (string, error) {
 
 func (b *Builder) addSummary() string {
 	res := "\n"
-	res += fmt.Sprintf("Rules validated total: %d\n", b.Report.TotalRules)
+	res += fmt.Sprintf("Groups total: %d, Rules total: %d\n", b.Report.TotalGroups, b.Report.TotalRules)
 	res += fmt.Sprintf(
 		"Selectors total: %d, Results found: %d, No Results found %d (No Results/Total: %.2f%%)",
 		b.Report.TotalSelectorsFailed+b.Report.TotalSelectorsSuccess,

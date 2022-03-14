@@ -58,7 +58,10 @@ type Report struct {
 	// SectionsCount represents the length of Sections
 	SectionsCount int `json:"rules_warnings,omitempty" yaml:"rules_warnings,omitempty"`
 
-	// TotalRules represents the total amount of checked rules
+	// TotalRules represents the total amount of checked groups
+	TotalGroups int `json:"groups_total,omitempty" yaml:"groups_total,omitempty"`
+
+	// TotalGroups represents the total amount of checked rules
 	TotalRules int `json:"rules_total,omitempty" yaml:"rules_total,omitempty"`
 
 	// TotalSelectorsFailed represents the total amount of probed selectors not containing a result value
@@ -126,13 +129,19 @@ func (b *Builder) AddSection(file, group, name, expression string, failed []stri
 	b.Report.TotalSelectorsSuccess += len(success)
 }
 
-// AddTotalCheckedRules adds checked rules to the total amount
-// TotalRules is used for report metrics
+// AddTotalCheckedRules adds checked rules to the total amount.
+// TotalRules is used for report metrics.
 func (b *Builder) AddTotalCheckedRules(count int) {
 	b.Report.TotalRules += count
 }
 
-// ToYAML returns the report in yaml format
+// AddTotalCheckedGroups adds checked groups to the total amount.
+// TotalGroups is used for report metrics.
+func (b *Builder) AddTotalCheckedGroups(count int) {
+	b.Report.TotalGroups += count
+}
+
+// ToYAML returns the report in yaml format.
 func (b *Builder) ToYAML() (string, error) {
 	b.finalize()
 	raw, err := yaml.Marshal(b)
@@ -143,7 +152,7 @@ func (b *Builder) ToYAML() (string, error) {
 	return string(raw), nil
 }
 
-// ToJSON returns the report in json format
+// ToJSON returns the report in json format.
 func (b *Builder) ToJSON() (string, error) {
 	b.finalize()
 	raw, err := json.MarshalIndent(b, "", "  ")
@@ -154,7 +163,7 @@ func (b *Builder) ToJSON() (string, error) {
 	return string(raw), nil
 }
 
-// Dump prints the report to the builder's output target in the desired format
+// Dump prints the report to the builder's output target in the desired format.
 func (b *Builder) Dump() error {
 	if !b.HasContent() {
 		return errors.New("nothing to report")
@@ -173,7 +182,7 @@ func (b *Builder) Dump() error {
 	return err
 }
 
-// DumpYAML prints the report to the builder's output target in yaml format
+// DumpYAML prints the report to the builder's output target in yaml format.
 func (b *Builder) DumpYAML() error {
 	res, err := b.ToYAML()
 	if err != nil {
@@ -183,7 +192,7 @@ func (b *Builder) DumpYAML() error {
 	return nil
 }
 
-// DumpJSON prints the report to the builder's output target in json format
+// DumpJSON prints the report to the builder's output target in json format.
 func (b *Builder) DumpJSON() error {
 	res, err := b.ToJSON()
 	if err != nil {
@@ -193,7 +202,7 @@ func (b *Builder) DumpJSON() error {
 	return nil
 }
 
-// DumpTree prints the report to the builder's output target in text format
+// DumpTree prints the report to the builder's output target in text format.
 func (b *Builder) DumpTree() error {
 	res, err := b.ToTree()
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 
 func TestPrometheusRulesChecker_CheckRuleGroups(t *testing.T) {
 	type fields struct {
-		probe                  Probe
+		probe                  Prober
 		ignoredSelectorsRegexp []string
 		ignoredGroupsRegexp    []string
 	}
@@ -48,7 +48,7 @@ func TestPrometheusRulesChecker_CheckRuleGroups(t *testing.T) {
 
 func TestPrometheusRulesChecker_checkRuleGroup(t *testing.T) {
 	type fields struct {
-		probe                  Probe
+		probe                  Prober
 		ignoredSelectorsRegexp []string
 		ignoredGroupsRegexp    []string
 	}
@@ -86,7 +86,7 @@ func TestPrometheusRulesChecker_checkRuleGroup(t *testing.T) {
 
 func TestPrometheusRulesChecker_probeSelectorResults(t *testing.T) {
 	type fields struct {
-		probe                  Probe
+		probe                  Prober
 		ignoredSelectorsRegexp []string
 		ignoredGroupsRegexp    []string
 	}
