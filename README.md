@@ -85,7 +85,7 @@ Flags:
 
 Promcheck uses 256 colors terminal mode. On 'nix OS system make sure the `TERM` environment variable is set.
 
-```
+```bash
 export TERM=xterm-256color
 ```
 
@@ -107,7 +107,7 @@ There might be more formats in near future. Feel free to contribute!
 Promcheck can also be executed from within a container. The latest container image of Promcheck is hosted on [quay.io](https://quay.io/repository/cbrgm/promcheck).
 To run Promcheck from within a container (assuming that there is a rule file named `rules.yaml` in the current directory), run:
 
-```
+```bash
 docker run -v $(pwd):/tmp --rm quay.io/cbrgm/promcheck:latest --check.file="/tmp/rules.yaml"
 ```
 
