@@ -13,16 +13,16 @@ import (
 )
 
 const (
-	// DefaultFormat dumps CheckReports
+	// DefaultFormat dumps Report as Text
 	DefaultFormat = "graph"
 
-	// YAMLFormat dumps CheckReports as YAML.
+	// YAMLFormat dumps Report as YAML
 	YAMLFormat = "yaml"
 
-	// JSONFormat dumps CheckReports as JSON.
+	// JSONFormat dumps Report as JSON
 	JSONFormat = "json"
 
-	// PrometheusFormat pushes CheckReports as Prometheus metrics. todo(cbrgm): implement me
+	// PrometheusFormat converts Report to Prometheus metrics
 	PrometheusFormat = "prometheus"
 )
 
@@ -156,7 +156,6 @@ func (b *Builder) AddTotalCheckedGroups(count int) {
 // ToYAML returns the report in yaml format.
 func (b *Builder) ToYAML() (string, error) {
 	b.finalize()
-	defer b.clear()
 	raw, err := yaml.Marshal(b)
 	if err != nil {
 		return "", err
