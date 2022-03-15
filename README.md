@@ -125,7 +125,7 @@ Flags:
       --exporter.addr="0.0.0:9093"                         The address the http server is running at
       --exporter.interval=300                              Delay in seconds between promcheck runs
       --metrics.profile                                    Enable pprof profiling
-      --metrics.runtime                                    Enable bot runtime metrics
+      --metrics.runtime                                    Enable runtime metrics
       --metrics.prefix=""                                  Set metrics prefix path
       --log.json                                           Tell promcheck to log json and not key value pairs
       --log.level="info"                                   The log level to use for filtering logs
