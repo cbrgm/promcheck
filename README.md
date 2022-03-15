@@ -9,15 +9,15 @@
 
 ## About
 
-**Promcheck supports you to identify recording or alerting rules using missing metrics or wrong label matchers** (e.g.
+**`promcheck` enables you to identify recording or alerting rules using missing metrics or wrong label matchers** (e.g.
 because of exporter changes or human-errors).
 
-Promcheck probes Prometheus [vector selectors](https://prometheus.io/docs/prometheus/latest/querying/basics/) and checks
-if they return a result value or not. As a basis for validation, Promcheck uses Prometheus rule files but it can also
-query rules from a running Prometheus instance. Promcheck will scan the PromQL expression of
+`promcheck` validates Prometheus [vector selectors](https://prometheus.io/docs/prometheus/latest/querying/basics/) and checks
+if they return a result value or not. As a basis for validation, `promcheck` uses Prometheus rule files, but it can also
+query rules directly from a running Prometheus instance. It scans the PromQL expression of
 each [recording](https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/)
-and [alerting](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) rule, take the individual
-referenced selectors out of it and probe them against a Prometheus instance.
+and [alerting](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) rule, takes the individual
+referenced selectors out of it and probes them against a remote Prometheus instance.
 
 
 <div align="center">
@@ -28,21 +28,22 @@ referenced selectors out of it and probe them against a Prometheus instance.
 
 ## Installation
 
-Promcheck is available on Linux, OSX and Windows platforms. Binaries for Linux, Windows and Mac are available as
+`promcheck` is available on Linux, OSX and Windows platforms. Binaries for Linux, Windows and Mac are available as
 tarballs in the [release](https://github.com/cbrgm/promcheck/releases) page.
 
-You may also build promcheck from source (using Go 1.17+). In order to build Promcheck from source you must:
+You may also build `promcheck` from source (using Go 1.17+). In order to build `promcheck` from source you must:
 
 * Clone this repository
 * Run `make install`
 
 ## Basic Usage
 
-There are three different modes with which promcheck can be used:
+`promcheck` can be used in two different modes:
 
-* Let `promcheck` validate the rules from existing rule files
-* Let `promcheck` validate the rules of a running Prometheus instance
-* Run `promcheck` as a Prometheus exporter (and results as export metrics)
+* validate rules from existing rule files (and export results in various formats)
+* validate rules from a running Prometheus instance (and export results in various formats)
+
+`promcheck` can also be executed as a Prometheus exporter to check a set of rules on a regular basis and export results as scrapeable Prometheus metrics via http.
 
 ### Validate rules from a running Prometheus instance
 
@@ -131,7 +132,7 @@ Flags:
       --log.level="info"                                   The log level to use for filtering logs
 ```
 
-Promcheck uses 256 colors terminal mode. On 'nix OS system make sure the `TERM` environment variable is set.
+`promcheck` uses 256 colors terminal mode. On 'nix OS system make sure the `TERM` environment variable is set.
 
 ```bash
 export TERM=xterm-256color
@@ -139,10 +140,10 @@ export TERM=xterm-256color
 
 #### Usage Information
 
-Keep in mind that Promcheck may also contain **false positives**, since there may be vector selectors in rules that
+Keep in mind that `promcheck` may also contain **false positives**, since there may be vector selectors in rules that
 intentionally do not return a result value.
 
-Promcheck does a single HTTP request per vector selector to be probed against the remote Prometheus instance. With many rules to validate, execution time can take longer and lead to many HTTP requests. The interval between probes can be changed with the `--check.delay` flag, which results in fewer requests but increases the runtime of the tool.
+`promcheck` does a single HTTP request per vector selector to be probed against the remote Prometheus instance. With many rules to validate, execution time can take longer and lead to many HTTP requests. The interval between probes can be changed with the `--check.delay` flag, which results in fewer requests but increases the runtime of the tool.
 
 ### Output formats
 
@@ -156,21 +157,28 @@ There might be more formats in near future. Feel free to contribute!
 
 ### Container Usage
 
-Promcheck can also be executed from within a container. The latest container image of Promcheck is hosted
-on [quay.io](https://quay.io/repository/cbrgm/promcheck). To run Promcheck from within a container (assuming that there
-is a rule file named `rules.yaml` in the current directory), run:
+`promcheck` can also be executed from within a container. The latest container image of `promcheck` is hosted
+on [quay.io](https://quay.io/repository/cbrgm/promcheck). 
+
+To run `promcheck` from within a container (assuming that there is a rule file named `rules.yaml` in the current directory), run:
 
 ```bash
-docker run -v $(pwd):/tmp --rm quay.io/cbrgm/promcheck:latest --check.file="/tmp/rules.yaml"
+docker run -v $(pwd):/tmp --rm quay.io/cbrgm/promcheck:latest --prometheus.url='http://0.0.0.0:9090' --check.file="/tmp/rules.yaml"
+```
+
+To run `promcheck` from within a container as a Prometheus exporter, run:
+
+```bash
+docker run --rm -p 9093:9093 quay.io/cbrgm/promcheck:latest --prometheus.url='http://0.0.0.0:9090' --exporter.enabled
 ```
 
 ### Kubernetes Deployment
 
-Promcheck can be executed as a Prometheus exporter to validate a set of rules on a regular basis. Please refer to the `kubernetes.yaml` file for a basic deployment example.
+`promcheck` can be executed as a Prometheus exporter to validate a set of rules on a regular basis. Please refer to the [kubernetes.yaml](https://github.com/cbrgm/promcheck/blob/main/kubernetes.yaml) file for a basic deployment example.
 
 ### Examples
 
-Please refer below for some basic usage examples demonstrating what Promcheck can do for you!
+Please refer below for some basic usage examples demonstrating what `promcheck` can do for you!
 
 #### Basic Example validating multiple rule groups
 
