@@ -44,7 +44,7 @@ There are three different modes with which promcheck can be used:
 * Let `promcheck` validate the rules of a running Prometheus instance
 * Run `promcheck` as a Prometheus exporter (and results as export metrics)
 
-### Validate the rules of a running Prometheus instance
+### Validate rules from a running Prometheus instance
 
 ```bash
 promcheck --prometheus.url="http://0.0.0.0:9090"
@@ -54,7 +54,7 @@ Argument Reference:
 
 * `--prometheus.url` - The Prometheus instance to probe selectors against
 
-### Validate the rules from existing rule files
+### Validate rules from existing rule files
 
 ```bash
 promcheck --prometheus.url="http://0.0.0.0:9090" --check.file=rules.yaml
