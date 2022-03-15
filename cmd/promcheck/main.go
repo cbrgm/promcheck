@@ -46,7 +46,7 @@ type config struct {
 
 	// exporter parameters
 	ExporterModeEnabled          bool   `name:"exporter.enabled" default:"false" help:"Run promcheck as a prometheus exporter"`
-	ExporterHttpAddr             string `name:"exporter.addr" default:"0.0.0:9093" help:"The address the http server is running at"`
+	ExporterHttpAddr             string `name:"exporter.addr" default:"0.0.0.0:9093" help:"The address the http server is running at"`
 	ExporterInterval             int    `name:"exporter.interval" default:"300" help:"Delay in seconds between promcheck runs"`
 	ExporterEnableProfiling      bool   `name:"metrics.profile" default:"true" help:"Enable pprof profiling"`
 	ExporterEnableRuntimeMetrics bool   `name:"metrics.runtime" default:"true" help:"Enable runtime metrics"`

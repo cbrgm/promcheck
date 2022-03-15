@@ -28,7 +28,6 @@ type Checker interface {
 }
 
 type promcheckApp struct {
-	// optExporterHttpAddr - The address the http server is running at
 	optExporterHttpAddr             string
 	optExporterInterval             time.Duration
 	optExporterEnableProfiling      bool
