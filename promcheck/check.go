@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/prometheus/prometheus/model/labels"
-	"github.com/prometheus/prometheus/model/rulefmt"
 	promql "github.com/prometheus/prometheus/promql/parser"
 )
 
@@ -37,6 +36,29 @@ type PrometheusRulesChecker struct {
 	// options
 	ignoredSelectorsRegexp []string
 	ignoredGroupsRegexp    []string
+}
+
+// RuleGroup models a rule group that contains a set of recording and alerting rules.
+type RuleGroup struct {
+
+	// Name represents the name of the rule group
+	Name string `json:"name"`
+
+	// File represents the name of the rule group
+	File string `json:"file"`
+
+	// Rules represents a list of Rule
+	Rules []Rule `json:"rules"`
+}
+
+// Rule describes an alerting or recording rule.
+type Rule struct {
+
+	// Name represents the checked recording rule or alert name
+	Name string `json:"name"`
+
+	// Expression represents the PromQL expression string
+	Expression string `json:"expr"`
 }
 
 // CheckResult represents a check result
@@ -75,13 +97,13 @@ func NewPrometheusRulesChecker(config PrometheusRulesCheckerConfig, client prome
 
 // CheckRuleGroups checks Prometheus rule groups.
 // CheckRuleGroups returns a list of CheckResult.
-func (prc *PrometheusRulesChecker) CheckRuleGroups(fileName string, groups []rulefmt.RuleGroup) ([]CheckResult, error) {
+func (prc *PrometheusRulesChecker) CheckRuleGroups(groups []RuleGroup) ([]CheckResult, error) {
 	results := []CheckResult{}
 	for _, g := range groups {
 		if isIgnoredGroup(prc.ignoredGroupsRegexp, g.Name) {
 			continue
 		}
-		res, err := prc.checkRuleGroup(fileName, g)
+		res, err := prc.CheckRuleGroup(g)
 		if err != nil {
 			return results, err
 		}
@@ -90,30 +112,20 @@ func (prc *PrometheusRulesChecker) CheckRuleGroups(fileName string, groups []rul
 	return results, nil
 }
 
-// checkRuleGroup checks a single rule group.
-// checkRuleGroup returns a list of CheckResult.
-func (prc *PrometheusRulesChecker) checkRuleGroup(fileName string, group rulefmt.RuleGroup) ([]CheckResult, error) {
+// CheckRuleGroup checks a single rule group.
+// CheckRuleGroup returns a list of CheckResult.
+func (prc *PrometheusRulesChecker) CheckRuleGroup(group RuleGroup) ([]CheckResult, error) {
 	results := []CheckResult{}
 	for _, rule := range group.Rules {
-		success, failed, err := prc.probeSelectorResults(rule.Expr.Value)
+		success, failed, err := prc.probeSelectorResults(rule.Expression)
 		if err != nil {
 			return results, err
 		}
-
-		var ruleName string
-		if rule.Record.Value == "" {
-			ruleName = rule.Alert.Value
-		}
-
-		if rule.Alert.Value == "" {
-			ruleName = rule.Record.Value
-		}
-
 		result := CheckResult{
-			File:       fileName,
-			Name:       ruleName,
+			File:       group.File,
+			Name:       rule.Name,
 			Group:      group.Name,
-			Expression: rule.Expr.Value,
+			Expression: rule.Expression,
 			Results:    failed,
 			NoResults:  success,
 		}

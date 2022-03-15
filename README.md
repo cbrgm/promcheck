@@ -1,4 +1,5 @@
 # promcheck ✔️
+
 **A tool to identify faulty [Prometheus](https://prometheus.io/) rules**
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/cbrgm/promcheck)](https://goreportcard.com/report/github.com/cbrgm/promcheck)
@@ -8,12 +9,15 @@
 
 ## About
 
-**Promcheck supports you to identify recording or alerting rules using missing metrics or wrong label matchers** (e.g. because of exporter changes or human-errors).
+**Promcheck supports you to identify recording or alerting rules using missing metrics or wrong label matchers** (e.g.
+because of exporter changes or human-errors).
 
 Promcheck probes Prometheus [vector selectors](https://prometheus.io/docs/prometheus/latest/querying/basics/) and checks
-if they return a result value or not. As a basis for validation, Promcheck uses Prometheus rule files, scans the PromQL expressions of each [recording](https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/)
-and [alerting](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) rule, takes the individual
-referenced selectors out of it and probes them against a Prometheus instance.
+if they return a result value or not. As a basis for validation, Promcheck uses Prometheus rule files but it can also
+query rules from a running Prometheus instance. Promcheck will scan the PromQL expression of
+each [recording](https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/)
+and [alerting](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) rule, take the individual
+referenced selectors out of it and probe them against a Prometheus instance.
 
 
 <div align="center">
@@ -21,8 +25,6 @@ referenced selectors out of it and probes them against a Prometheus instance.
 <img src="https://github.com/cbrgm/promcheck/blob/main/.img/demo.gif" width="85%">
 <br>
 </div>
-
-Keep in mind that Promcheck may also contain **false positives**, since there may be vector selectors in rules that intentionally do not return a result value.
 
 ## Installation
 
@@ -36,8 +38,26 @@ You may also build promcheck from source (using Go 1.17+). In order to build Pro
 
 ## Basic Usage
 
+There are three different modes with which promcheck can be used:
+
+* Let `promcheck` validate the rules from existing rule files
+* Let `promcheck` validate the rules of a running Prometheus instance
+* Run `promcheck` as a Prometheus exporter (and results as export metrics)
+
+### Validate the rules of a running Prometheus instance
+
 ```bash
-promcheck --prometheus.url="http://0.0.0.0:9090" --check.file=STRING
+promcheck --prometheus.url="http://0.0.0.0:9090"
+```
+
+Argument Reference:
+
+* `--prometheus.url` - The Prometheus instance to probe selectors against
+
+### Validate the rules from existing rule files
+
+```bash
+promcheck --prometheus.url="http://0.0.0.0:9090" --check.file=rules.yaml
 ```
 
 Argument Reference:
@@ -53,17 +73,39 @@ Argument Reference:
 promcheck --prometheus.url="http://0.0.0.0:9090" \
           --check.file=rules.yaml
           
-# validate two rules files `rules-foo.yaml` and `rules-bar.yaml`
-promcheck --prometheus.url="http://0.0.0.0:9090" \
-          --check.file=rules-foo.yaml \
-          --check.file=rules-bar.yaml
-
 # validate all *.yaml files in directory ./config
 promcheck --prometheus.url="http://0.0.0.0:9090" \
           --check.file='./config/*.yaml'
 ```
 
 </details>
+
+### Run `promcheck` as a Prometheus exporter
+
+```bash
+# run promcheck as a prometheus exporter.
+# promcheck will validate all rules from the remote instance.
+promcheck --prometheus.url="http://0.0.0.0:9090" \
+          --exporter.enabled=true \ 
+          --exporter.interval=300 \
+          --exporter.addr=0.0.0.0:9093
+
+# run promcheck as a prometheus exporter.
+# promcheck will validate all rules from the rules.yaml file  
+promcheck --prometheus.url="http://0.0.0.0:9090" \
+          --exporter.enabled=true \ 
+          --exporter.interval=300 \
+          --exporter.addr=0.0.0.0:9093 \
+          --check.file=rules.yaml
+```
+
+Argument Reference:
+
+* `--prometheus.url` - The Prometheus instance to probe selectors against
+* `--check.file` - The Prometheus rule file(s) to validate.
+* `--exporter.enabled` - Run `promcheck` as a Prometheus exporter
+* `--exporter.addr` - The exporter's http address
+* `--exporter.interval` - The interval in minutes to run `promcheck` and update metrics
 
 ### Configuration
 
@@ -79,6 +121,12 @@ Flags:
       --check.file=STRING                                  The rule files to check.
       --output.format="graph"                              The output format to use
       --output.no-color                                    Toggle colored output
+      --exporter.enabled                                   Run promcheck as a prometheus exporter
+      --exporter.addr="0.0.0:9093"                         The address the http server is running at
+      --exporter.interval=300                              Delay in seconds between promcheck runs
+      --metrics.profile                                    Enable pprof profiling
+      --metrics.runtime                                    Enable bot runtime metrics
+      --metrics.prefix=""                                  Set metrics prefix path
       --log.json                                           Tell promcheck to log json and not key value pairs
       --log.level="info"                                   The log level to use for filtering logs
 ```
@@ -89,8 +137,12 @@ Promcheck uses 256 colors terminal mode. On 'nix OS system make sure the `TERM` 
 export TERM=xterm-256color
 ```
 
-> Note: Promcheck does a single HTTP request per vector selector to be probed against the remote Prometheus instance. With many rules to validate, execution time can take longer and lead to many HTTP requests. The interval between probes can be changed with the `--check.delay` flag, which results in fewer requests but increases the runtime of the tool.
+#### Usage Information
 
+Keep in mind that Promcheck may also contain **false positives**, since there may be vector selectors in rules that
+intentionally do not return a result value.
+
+Promcheck does a single HTTP request per vector selector to be probed against the remote Prometheus instance. With many rules to validate, execution time can take longer and lead to many HTTP requests. The interval between probes can be changed with the `--check.delay` flag, which results in fewer requests but increases the runtime of the tool.
 
 ### Output formats
 
@@ -104,17 +156,17 @@ There might be more formats in near future. Feel free to contribute!
 
 ### Container Usage
 
-Promcheck can also be executed from within a container. The latest container image of Promcheck is hosted on [quay.io](https://quay.io/repository/cbrgm/promcheck).
-To run Promcheck from within a container (assuming that there is a rule file named `rules.yaml` in the current directory), run:
+Promcheck can also be executed from within a container. The latest container image of Promcheck is hosted
+on [quay.io](https://quay.io/repository/cbrgm/promcheck). To run Promcheck from within a container (assuming that there
+is a rule file named `rules.yaml` in the current directory), run:
 
 ```bash
 docker run -v $(pwd):/tmp --rm quay.io/cbrgm/promcheck:latest --check.file="/tmp/rules.yaml"
 ```
 
-### Kubernetes Cronjob
+### Kubernetes Deployment
 
-Promcheck can be executed as a [Kubernetes CronJob](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/) resource to validate a set of rules on a regular basis.
-Please refer to the `kubernetes.yaml` file for a basic deployment example.
+Promcheck can be executed as a Prometheus exporter to validate a set of rules on a regular basis. Please refer to the `kubernetes.yaml` file for a basic deployment example.
 
 ### Examples
 
@@ -186,6 +238,7 @@ Please refer below for some basic usage examples demonstrating what Promcheck ca
 </details>
 
 **Command**:
+
 ```bash
 ➜ ./promcheck --check.file 'rules.yaml' --prometheus.url http://0.0.0.0:9090
 ```
@@ -193,6 +246,7 @@ Please refer below for some basic usage examples demonstrating what Promcheck ca
 * Prometheus instance running locally on `http://0.0.0.0:9090`
 
 **Output**:
+
 ```
 .
 └── [file] examples/rules_multiple_groups.yaml
@@ -216,6 +270,7 @@ Selectors total: 5, Results found: 4, No Results found 1 (Failed/Total: 20.00%)
 **Command**:
 
 Ignore rule group `kubernetes-system-controller-manager-demo-group`
+
 ```bash
 ➜ ./promcheck --check.file 'rules.yaml' \
               --check.ignore-group 'kubernetes-system-controller-manager-demo-group' \
@@ -225,6 +280,7 @@ Ignore rule group `kubernetes-system-controller-manager-demo-group`
 * Prometheus instance running locally on `http://0.0.0.0:9090`
 
 **Output**:
+
 ```
 .
 └── [file] examples/rules_multiple_groups.yaml
@@ -245,6 +301,7 @@ Selectors total: 4, Results found: 3, No Results found 1 (Failed/Total: 25.00%)
 **Command**:
 
 Output json:
+
 ```bash
 ➜ ./promcheck --check.file 'rules.yaml' \
               --check.ignore-group 'kubernetes-system-controller-manager-demo-group' \
@@ -253,6 +310,7 @@ Output json:
 ```
 
 **Output**:
+
 ```json
 {
   "promcheck": {

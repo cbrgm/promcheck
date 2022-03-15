@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cbrgm/promcheck/promcheck/metrics"
 	"io"
 	"os"
 
@@ -14,10 +15,13 @@ import (
 const (
 	// DefaultFormat dumps CheckReports
 	DefaultFormat = "graph"
+
 	// YAMLFormat dumps CheckReports as YAML.
 	YAMLFormat = "yaml"
+
 	// JSONFormat dumps CheckReports as JSON.
 	JSONFormat = "json"
+
 	// PrometheusFormat pushes CheckReports as Prometheus metrics. todo(cbrgm): implement me
 	PrometheusFormat = "prometheus"
 )
@@ -34,10 +38,13 @@ type Builder struct {
 	// outputTarget represents the output target
 	// Default: stdout  todo(cbrgm): make me configurable
 	outputTarget io.ReadWriteCloser
+
+	// metrics represents promcheck metrics
+	metrics metrics.Metrics
 }
 
 // NewBuilder returns a new Builder
-func NewBuilder(outputFormat string, noColor bool) *Builder {
+func NewBuilder(outputFormat string, noColor bool, metrics metrics.Metrics) *Builder {
 	color.NoColor = noColor
 	if outputFormat == "" {
 		outputFormat = DefaultFormat
@@ -46,6 +53,7 @@ func NewBuilder(outputFormat string, noColor bool) *Builder {
 		Report:       Report{},
 		outputFormat: outputFormat,
 		outputTarget: os.Stdout,
+		metrics:      metrics,
 	}
 }
 
@@ -114,6 +122,10 @@ func (b *Builder) finalize() {
 	b.Report.RatioFailedTotal = (float32(b.Report.TotalSelectorsFailed) / float32(totalSelectors)) * 100
 }
 
+func (b *Builder) clear() {
+	b.Report = Report{}
+}
+
 // AddSection adds a new section to the report
 func (b *Builder) AddSection(file, group, name, expression string, failed []string, success []string) {
 	b.Report.Sections = append(b.Report.Sections, Section{
@@ -144,11 +156,11 @@ func (b *Builder) AddTotalCheckedGroups(count int) {
 // ToYAML returns the report in yaml format.
 func (b *Builder) ToYAML() (string, error) {
 	b.finalize()
+	defer b.clear()
 	raw, err := yaml.Marshal(b)
 	if err != nil {
 		return "", err
 	}
-
 	return string(raw), nil
 }
 
@@ -176,6 +188,8 @@ func (b *Builder) Dump() error {
 		err = b.DumpJSON()
 	case DefaultFormat:
 		err = b.DumpTree()
+	case PrometheusFormat:
+		err = b.DumpPrometheusMetrics()
 	default:
 		err = b.DumpTree()
 	}
@@ -184,6 +198,7 @@ func (b *Builder) Dump() error {
 
 // DumpYAML prints the report to the builder's output target in yaml format.
 func (b *Builder) DumpYAML() error {
+	defer b.clear()
 	res, err := b.ToYAML()
 	if err != nil {
 		return err
@@ -194,6 +209,7 @@ func (b *Builder) DumpYAML() error {
 
 // DumpJSON prints the report to the builder's output target in json format.
 func (b *Builder) DumpJSON() error {
+	defer b.clear()
 	res, err := b.ToJSON()
 	if err != nil {
 		return err
@@ -204,10 +220,21 @@ func (b *Builder) DumpJSON() error {
 
 // DumpTree prints the report to the builder's output target in text format.
 func (b *Builder) DumpTree() error {
+	defer b.clear()
 	res, err := b.ToTree()
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(b.outputTarget, "%v\n", res)
+	return nil
+}
+
+// DumpPrometheusMetrics converts the report to Prometheus metrics.
+func (b *Builder) DumpPrometheusMetrics() error {
+	defer b.clear()
+	err := b.ToPrometheusMetrics()
+	if err != nil {
+		return err
+	}
 	return nil
 }

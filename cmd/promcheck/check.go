@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"github.com/cbrgm/promcheck/promcheck/metrics"
 	"github.com/prometheus/client_golang/api"
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"path/filepath"
@@ -14,72 +16,138 @@ import (
 	"github.com/prometheus/prometheus/model/rulefmt"
 )
 
-func checkRulesFromRuleFiles(config *config, logger log.Logger) error {
-	var (
-		delay            = time.Duration(config.CheckDelay) * time.Second
-		prometheusUrl    = config.PrometheusUrl
-		ignoredSelectors = config.CheckIgnoredSelectorsRegexp
-		ignoredGroups    = config.CheckIgnoredGroupsRegexp
-		filePaths        = config.CheckFiles
-		outputFormat     = config.OutputFormat
-		outputNoColor    = config.OutputNoColor
-	)
+type Reporter interface {
+	Dump() error
+	AddSection(file, group, name, expression string, failed []string, success []string)
+	AddTotalCheckedGroups(count int)
+	AddTotalCheckedRules(count int)
+}
 
-	client, err := api.NewClient(api.Config{Address: prometheusUrl})
+type Checker interface {
+	CheckRuleGroup(group promcheck.RuleGroup) ([]promcheck.CheckResult, error)
+}
+
+type promcheckApp struct {
+	// optExporterHttpAddr - The address the http server is running at
+	optExporterHttpAddr             string
+	optExporterInterval             time.Duration
+	optExporterEnableProfiling      bool
+	optExporterEnableRuntimeMetrics bool
+	optExporterMetricsPrefix        string
+	optExporterModeEnabled          bool
+	optPrometheusUrl                string
+	optFilesRegexp                  string
+
+	check   Checker
+	report  Reporter
+	logger  log.Logger
+	metrics metrics.Metrics
+}
+
+func newPromcheck(config *config, logger log.Logger) (*promcheckApp, error) {
+	// write prometheus metrics when exporter mode is enabled
+	if config.ExporterModeEnabled {
+		config.OutputFormat = report.PrometheusFormat
+	}
+
+	client, err := api.NewClient(api.Config{Address: config.PrometheusUrl})
 	if err != nil {
 		level.Error(logger).Log("msg", "failed to create Prometheus client", "err", err)
-		return err
+		return nil, err
 	}
 
+	promAPI := prometheusv1.NewAPI(client)
 	checker := promcheck.NewPrometheusRulesChecker(
 		promcheck.PrometheusRulesCheckerConfig{
-			ProbeDelay:             delay,
-			PrometheusUrl:          prometheusUrl,
-			IgnoredSelectorsRegexp: ignoredSelectors,
-			IgnoredGroupsRegexp:    ignoredGroups,
+			ProbeDelay:             time.Duration(config.CheckDelay) * time.Second,
+			PrometheusUrl:          config.PrometheusUrl,
+			IgnoredSelectorsRegexp: config.CheckIgnoredSelectorsRegexp,
+			IgnoredGroupsRegexp:    config.CheckIgnoredGroupsRegexp,
 		},
-		prometheusv1.NewAPI(client),
+		promAPI,
 	)
 
-	builder := report.NewBuilder(
-		outputFormat,
-		outputNoColor,
+	promMetrics := metrics.NewPrometheus(metrics.Options{
+		Prefix:               config.ExporterMetricsPrefix,
+		EnableProfile:        config.ExporterEnableProfiling,
+		EnableRuntimeMetrics: config.ExporterEnableRuntimeMetrics,
+		PrometheusRegistry:   nil,
+	})
+
+	reporter := report.NewBuilder(
+		config.OutputFormat,
+		config.OutputNoColor,
+		promMetrics,
 	)
 
-	matches, err := filepath.Glob(fmt.Sprintf("%s", filePaths))
+	return &promcheckApp{
+		// options
+		optExporterHttpAddr:             config.ExporterHttpAddr,
+		optExporterInterval:             time.Duration(config.ExporterInterval) * time.Second,
+		optExporterEnableProfiling:      config.ExporterEnableProfiling,
+		optExporterEnableRuntimeMetrics: config.ExporterEnableRuntimeMetrics,
+		optExporterMetricsPrefix:        config.ExporterMetricsPrefix,
+		optExporterModeEnabled:          config.ExporterModeEnabled,
+		optPrometheusUrl:                config.PrometheusUrl,
+		optFilesRegexp:                  config.CheckFiles,
+
+		// internal
+		check:   checker,
+		report:  reporter,
+		logger:  logger,
+		metrics: promMetrics,
+	}, nil
+}
+
+func (app *promcheckApp) run() error {
+	if app.optExporterModeEnabled {
+		return app.runPromcheckExporter()
+	}
+	return app.checkRules()
+}
+
+func (app *promcheckApp) checkRules() error {
+	if app.optFilesRegexp != "" {
+		return app.checkRulesFromRuleFiles()
+	}
+	return app.checkRulesFromPrometheusInstance()
+}
+
+func (app *promcheckApp) checkRulesFromRuleFiles() error {
+	matches, err := filepath.Glob(fmt.Sprintf("%s", app.optFilesRegexp))
 	if err != nil {
-		level.Error(logger).Log("msg", "failed to parse rule group file paths", "err", err)
+		level.Error(app.logger).Log("msg", "failed to parse rule group file paths", "err", err)
 		return err
 	}
 
-	filesToCheck := []rulesFile{}
+	ruleGroupsToCheck := []promcheck.RuleGroup{}
 	for _, file := range matches {
-		fileToCheck, err := processFile(file)
+		ruleGroups, err := processFile(file)
 		if err != nil {
-			level.Error(logger).Log("msg", "failed to parse rule group files", "err", err)
+			level.Error(app.logger).Log("msg", "failed to parse rule group files", "err", err)
 			return err
 		}
-		filesToCheck = append(filesToCheck, fileToCheck)
+		ruleGroupsToCheck = append(ruleGroupsToCheck, ruleGroups...)
 	}
 
-	res := []promcheck.CheckResult{}
-	for _, file := range filesToCheck {
-		checked, err := checker.CheckRuleGroups(file.File, file.groups)
+	if len(ruleGroupsToCheck) == 0 {
+		level.Error(app.logger).Log("msg", "no rule groups to check. Please check for --check.file flag spelling mistakes")
+		return err
+	}
+
+	checkResults := []promcheck.CheckResult{}
+	for _, group := range ruleGroupsToCheck {
+		checked, err := app.check.CheckRuleGroup(group)
 		if err != nil {
-			level.Error(logger).Log("msg", "failed to check rule groups", "file", file, "err", err)
+			level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
 			return err
 		}
-
-		res = append(res, checked...)
-
-		// count checked rules
-		for _, group := range file.groups {
-			builder.AddTotalCheckedGroups(1)
-			builder.AddTotalCheckedRules(len(group.Rules))
-		}
+		checkResults = append(checkResults, checked...)
+		app.report.AddTotalCheckedGroups(1)
+		app.report.AddTotalCheckedRules(len(group.Rules))
 	}
-	for _, cr := range res {
-		builder.AddSection(
+	for _, cr := range checkResults {
+		app.report.AddSection(
 			cr.File,
 			cr.Group,
 			cr.Name,
@@ -88,25 +156,110 @@ func checkRulesFromRuleFiles(config *config, logger log.Logger) error {
 			cr.NoResults,
 		)
 	}
-	return builder.Dump()
+	return app.report.Dump()
 }
 
-type rulesFile struct {
-	File   string
-	groups []rulefmt.RuleGroup
-}
-
-func processFile(file string) (rulesFile, error) {
+func processFile(file string) ([]promcheck.RuleGroup, error) {
 	ruleGroups, errs := rulefmt.ParseFile(file)
 	if len(errs) > 0 {
-		return rulesFile{
-			File:   file,
-			groups: []rulefmt.RuleGroup{},
-		}, fmt.Errorf("%s", errs)
+		return []promcheck.RuleGroup{}, fmt.Errorf("%s", errs)
 	}
 
-	return rulesFile{
-		File:   file,
-		groups: ruleGroups.Groups,
-	}, nil
+	converted := []promcheck.RuleGroup{}
+	for _, group := range ruleGroups.Groups {
+		converted = append(converted, rulefmtToPromcheck(file, group))
+	}
+	return converted, nil
+}
+
+func rulefmtToPromcheck(fileName string, group rulefmt.RuleGroup) promcheck.RuleGroup {
+	convertedRuleGroup := promcheck.RuleGroup{
+		Name:  group.Name,
+		File:  fileName,
+		Rules: []promcheck.Rule{},
+	}
+	for _, rule := range group.Rules {
+		var name string
+		if rule.Record.Value == "" {
+			name = rule.Alert.Value
+		}
+		if rule.Alert.Value == "" {
+			name = rule.Record.Value
+		}
+		convertedRuleGroup.Rules = append(convertedRuleGroup.Rules, promcheck.Rule{
+			Name:       name,
+			Expression: rule.Expr.Value,
+		})
+	}
+	return convertedRuleGroup
+}
+
+func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
+	client, err := api.NewClient(api.Config{Address: app.optPrometheusUrl})
+	if err != nil {
+		level.Error(app.logger).Log("msg", "failed to create Prometheus client", "err", err)
+		return err
+	}
+	promAPI := prometheusv1.NewAPI(client)
+	apiResponse, err := promAPI.Rules(context.TODO())
+	if err != nil {
+		level.Error(app.logger).Log("msg", "failed to receive rules from prometheus instance", "err", err)
+		return err
+	}
+
+	ruleGroupsToCheck := []promcheck.RuleGroup{}
+	for _, group := range apiResponse.Groups {
+		ruleGroupsToCheck = append(ruleGroupsToCheck, prometheusv1ToPromcheck(group))
+	}
+
+	if len(ruleGroupsToCheck) == 0 {
+		level.Error(app.logger).Log("msg", "no rule groups to check. Please check whether the Prometheus instance contains any rules.")
+		return err
+	}
+
+	checkResults := []promcheck.CheckResult{}
+	for _, group := range ruleGroupsToCheck {
+		checked, err := app.check.CheckRuleGroup(group)
+		if err != nil {
+			level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
+			return err
+		}
+		checkResults = append(checkResults, checked...)
+		app.report.AddTotalCheckedGroups(1)
+		app.report.AddTotalCheckedRules(len(group.Rules))
+	}
+	for _, cr := range checkResults {
+		app.report.AddSection(
+			cr.File,
+			cr.Group,
+			cr.Name,
+			cr.Expression,
+			cr.Results,
+			cr.NoResults,
+		)
+	}
+	return app.report.Dump()
+}
+
+func prometheusv1ToPromcheck(group prometheusv1.RuleGroup) promcheck.RuleGroup {
+	convertedRuleGroup := promcheck.RuleGroup{
+		Name:  group.Name,
+		File:  group.File,
+		Rules: []promcheck.Rule{},
+	}
+	for _, rule := range group.Rules {
+		switch v := rule.(type) {
+		case prometheusv1.RecordingRule:
+			convertedRuleGroup.Rules = append(convertedRuleGroup.Rules, promcheck.Rule{
+				Name:       v.Name,
+				Expression: v.Query,
+			})
+		case prometheusv1.AlertingRule:
+			convertedRuleGroup.Rules = append(convertedRuleGroup.Rules, promcheck.Rule{
+				Name:       v.Name,
+				Expression: v.Query,
+			})
+		}
+	}
+	return convertedRuleGroup
 }
