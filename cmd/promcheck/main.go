@@ -38,11 +38,19 @@ type config struct {
 	CheckIgnoredSelectorsRegexp []string `name:"check.ignore-selector" help:"Regexp of selectors to ignore"`
 	CheckIgnoredGroupsRegexp    []string `name:"check.ignore-group" help:"Regexp of rule groups to ignore"`
 	CheckDelay                  float64  `name:"check.delay" default:"0.1" help:"Delay in seconds between probe requests"`
-	CheckFiles                  string   `required:"true" name:"check.file" help:"The rule files to check."`
+	CheckFiles                  string   `name:"check.file" help:"The rule files to check."`
 
 	// output parameters
 	OutputFormat  string `name:"output.format" enum:"graph,json,yaml,csv" default:"graph" help:"The output format to use"`
 	OutputNoColor bool   `name:"output.no-color" default:"false" help:"Toggle colored output"`
+
+	// exporter parameters
+	ExporterModeEnabled          bool   `name:"exporter.enabled" default:"false" help:"Run promcheck as a prometheus exporter"`
+	ExporterHttpAddr             string `name:"exporter.addr" default:"0.0.0:9093" help:"The address the http server is running at"`
+	ExporterInterval             int    `name:"exporter.interval" default:"300" help:"Delay in seconds between promcheck runs"`
+	ExporterEnableProfiling      bool   `name:"metrics.profile" default:"true" help:"Enable pprof profiling"`
+	ExporterEnableRuntimeMetrics bool   `name:"metrics.runtime" default:"true" help:"Enable bot runtime metrics"`
+	ExporterMetricsPrefix        string `name:"metrics.prefix" default:"" help:"Set metrics prefix path"`
 
 	// log parameters
 	LogJSON  bool   `name:"log.json" default:"false" help:"Tell promcheck to log json and not key value pairs"`
@@ -82,9 +90,24 @@ func main() {
 		"caller", log.DefaultCaller,
 	)
 
-	err := checkRulesFromRuleFiles(&config, logger)
+	// validation
+	if config.ExporterInterval < 0 {
+		level.Error(logger).Log("msg", "configuration error", "err", "--exporter.interval must be > 0")
+		os.Exit(1)
+	}
+
+	if config.CheckDelay < 0 {
+		level.Error(logger).Log("msg", "configuration error", "err", "--check.delay must be > 0")
+		os.Exit(1)
+	}
+
+	// initialize promcheck
+	app, err := newPromcheck(&config, logger)
 	if err != nil {
-		level.Error(logger).Log("msg", "failed to check rule files", "err", err)
+		os.Exit(1)
+	}
+
+	if err := app.run(); err != nil {
 		os.Exit(1)
 	}
 	os.Exit(0)
