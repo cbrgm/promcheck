@@ -3,22 +3,23 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cbrgm/promcheck/promcheck/metrics"
-	"github.com/prometheus/client_golang/api"
-	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"path/filepath"
 	"time"
 
-	"github.com/cbrgm/promcheck/promcheck"
-	"github.com/cbrgm/promcheck/promcheck/report"
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
+	"github.com/prometheus/client_golang/api"
+	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/prometheus/model/rulefmt"
+
+	"github.com/cbrgm/promcheck/promcheck"
+	"github.com/cbrgm/promcheck/promcheck/metrics"
+	"github.com/cbrgm/promcheck/promcheck/report"
 )
 
 type Reporter interface {
 	Dump() error
-	AddSection(file, group, name, expression string, failed []string, success []string)
+	AddSection(file, group, name, expression string, failed, success []string)
 	AddTotalCheckedGroups(count int)
 	AddTotalCheckedRules(count int)
 }
@@ -28,13 +29,13 @@ type Checker interface {
 }
 
 type promcheckApp struct {
-	optExporterHttpAddr             string
+	optExporterHTTPAddr             string
 	optExporterInterval             time.Duration
 	optExporterEnableProfiling      bool
 	optExporterEnableRuntimeMetrics bool
 	optExporterMetricsPrefix        string
 	optExporterModeEnabled          bool
-	optPrometheusUrl                string
+	optPrometheusURL                string
 	optFilesRegexp                  string
 
 	check   Checker
@@ -49,7 +50,7 @@ func newPromcheck(config *config, logger log.Logger) (*promcheckApp, error) {
 		config.OutputFormat = report.PrometheusFormat
 	}
 
-	client, err := api.NewClient(api.Config{Address: config.PrometheusUrl})
+	client, err := api.NewClient(api.Config{Address: config.PrometheusURL})
 	if err != nil {
 		level.Error(logger).Log("msg", "failed to create Prometheus client", "err", err)
 		return nil, err
@@ -59,7 +60,7 @@ func newPromcheck(config *config, logger log.Logger) (*promcheckApp, error) {
 	checker := promcheck.NewPrometheusRulesChecker(
 		promcheck.PrometheusRulesCheckerConfig{
 			ProbeDelay:             time.Duration(config.CheckDelay) * time.Second,
-			PrometheusUrl:          config.PrometheusUrl,
+			PrometheusURL:          config.PrometheusURL,
 			IgnoredSelectorsRegexp: config.CheckIgnoredSelectorsRegexp,
 			IgnoredGroupsRegexp:    config.CheckIgnoredGroupsRegexp,
 		},
@@ -81,13 +82,13 @@ func newPromcheck(config *config, logger log.Logger) (*promcheckApp, error) {
 
 	return &promcheckApp{
 		// options
-		optExporterHttpAddr:             config.ExporterHttpAddr,
+		optExporterHTTPAddr:             config.ExporterHTTPAddr,
 		optExporterInterval:             time.Duration(config.ExporterInterval) * time.Second,
 		optExporterEnableProfiling:      config.ExporterEnableProfiling,
 		optExporterEnableRuntimeMetrics: config.ExporterEnableRuntimeMetrics,
 		optExporterMetricsPrefix:        config.ExporterMetricsPrefix,
 		optExporterModeEnabled:          config.ExporterModeEnabled,
-		optPrometheusUrl:                config.PrometheusUrl,
+		optPrometheusURL:                config.PrometheusURL,
 		optFilesRegexp:                  config.CheckFiles,
 
 		// internal
@@ -113,7 +114,7 @@ func (app *promcheckApp) checkRules() error {
 }
 
 func (app *promcheckApp) checkRulesFromRuleFiles() error {
-	matches, err := filepath.Glob(fmt.Sprintf("%s", app.optFilesRegexp))
+	matches, err := filepath.Glob(app.optFilesRegexp)
 	if err != nil {
 		level.Error(app.logger).Log("msg", "failed to parse rule group file paths", "err", err)
 		return err
@@ -194,7 +195,7 @@ func rulefmtToPromcheck(fileName string, group rulefmt.RuleGroup) promcheck.Rule
 }
 
 func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
-	client, err := api.NewClient(api.Config{Address: app.optPrometheusUrl})
+	client, err := api.NewClient(api.Config{Address: app.optPrometheusURL})
 	if err != nil {
 		level.Error(app.logger).Log("msg", "failed to create Prometheus client", "err", err)
 		return err

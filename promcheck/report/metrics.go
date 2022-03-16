@@ -14,7 +14,6 @@ func (b *Builder) ToPrometheusMetrics() error {
 		failed  []string
 	})
 	for _, section := range b.Report.Sections {
-
 		if nodeMap[section.File] == nil {
 			nodeMap[section.File] = make(map[string]map[string]struct {
 				success []string
@@ -30,13 +29,8 @@ func (b *Builder) ToPrometheusMetrics() error {
 
 		results := nodeMap[section.File][section.Group][section.Name]
 
-		for _, s := range section.Results {
-			results.success = append(results.success, s)
-		}
-
-		for _, s := range section.NoResults {
-			results.failed = append(results.failed, s)
-		}
+		results.success = append(results.success, section.Results...)
+		results.failed = append(results.failed, section.NoResults...)
 
 		nodeMap[section.File][section.Group][section.Name] = results
 	}

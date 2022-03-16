@@ -1,11 +1,12 @@
 package metrics
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"strings"
-	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -78,8 +79,8 @@ func (p *Prometheus) registerMetrics() {
 	p.registry.MustRegister(p.selectorsGaugeM)
 
 	if p.opts.EnableRuntimeMetrics {
-		p.registry.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-		p.registry.MustRegister(prometheus.NewGoCollector())
+		p.registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+		p.registry.MustRegister(collectors.NewGoCollector())
 	}
 }
 
@@ -99,11 +100,6 @@ func (p *Prometheus) getHandler() http.Handler {
 func (p *Prometheus) RegisterHandler(path string, mux *http.ServeMux) {
 	promHandler := p.getHandler()
 	mux.Handle(path, promHandler)
-}
-
-// sinceStart returns the seconds passed since the start time until now.
-func (p *Prometheus) sinceStart(start time.Time) float64 {
-	return time.Since(start).Seconds()
 }
 
 func (p *Prometheus) SetRuleGroupsTotal(value float64) {

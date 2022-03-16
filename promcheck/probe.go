@@ -3,12 +3,13 @@ package promcheck
 import (
 	"context"
 	"fmt"
+	"time"
+
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
-	"time"
 )
 
-// Prober represents probe
+// Prober represents probe.
 type Prober interface {
 	// ProbeSelector probes the given PromQL selector against a remote instance.
 	ProbeSelector(selector string) (float64, error)
@@ -17,14 +18,14 @@ type Prober interface {
 type prometheusProbe struct {
 	api           prometheusv1.API
 	delay         time.Duration
-	prometheusUrl string
+	prometheusURL string
 }
 
-func newPrometheusProbe(delay time.Duration, prometheusUrl string, client prometheusv1.API) Prober {
+func newPrometheusProbe(delay time.Duration, prometheusURL string, client prometheusv1.API) Prober {
 	return &prometheusProbe{
 		api:           client,
 		delay:         delay,
-		prometheusUrl: prometheusUrl,
+		prometheusURL: prometheusURL,
 	}
 }
 
@@ -46,7 +47,7 @@ func (p *prometheusProbe) probe(selector string) (float64, error) {
 	return metricValue, nil
 }
 
-// ProbeSelector implements Prober
+// ProbeSelector implements Prober.
 func (p *prometheusProbe) ProbeSelector(selector string) (float64, error) {
 	v, err := p.probe(selector)
 	if err != nil {
