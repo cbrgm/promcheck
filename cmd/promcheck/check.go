@@ -74,11 +74,14 @@ func newPromcheck(config *config, logger log.Logger) (*promcheckApp, error) {
 		PrometheusRegistry:   nil,
 	})
 
-	reporter := report.NewBuilder(
-		config.OutputFormat,
-		config.OutputNoColor,
-		promMetrics,
-	)
+	reportOptions := []report.BuilderOption{
+		report.WithFormat(config.OutputFormat),
+		report.WithMetrics(promMetrics),
+	}
+	if config.OutputNoColor {
+		reportOptions = append(reportOptions, report.WithoutColor())
+	}
+	reporter := report.NewBuilder(reportOptions...)
 
 	return &promcheckApp{
 		// options
@@ -201,13 +204,13 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 		return err
 	}
 	promAPI := prometheusv1.NewAPI(client)
-	apiResponse, err := promAPI.Rules(context.TODO())
+	apiResponse, err := promAPI.Rules(context.TODO()) // TODO: Can we somehow only load the ones we're interested in if filtered?
 	if err != nil {
 		level.Error(app.logger).Log("msg", "failed to receive rules from prometheus instance", "err", err)
 		return err
 	}
 
-	ruleGroupsToCheck := []promcheck.RuleGroup{}
+	ruleGroupsToCheck := make([]promcheck.RuleGroup, 0, len(apiResponse.Groups))
 	for _, group := range apiResponse.Groups {
 		ruleGroupsToCheck = append(ruleGroupsToCheck, prometheusv1ToPromcheck(group))
 	}

@@ -113,7 +113,7 @@ func (prc *PrometheusRulesChecker) CheckRuleGroups(groups []RuleGroup) ([]CheckR
 // CheckRuleGroup checks a single rule group.
 // CheckRuleGroup returns a list of CheckResult.
 func (prc *PrometheusRulesChecker) CheckRuleGroup(group RuleGroup) ([]CheckResult, error) {
-	results := []CheckResult{}
+	results := make([]CheckResult, 0, len(group.Rules))
 	for _, rule := range group.Rules {
 		success, failed, err := prc.probeSelectorResults(rule.Expression)
 		if err != nil {

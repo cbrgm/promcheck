@@ -32,28 +32,57 @@ type Builder struct {
 	// Report represents the report data
 	Report Report `json:"promcheck" yaml:"promcheck"`
 
-	// outputFormat represents the output format
-	outputFormat string
+	// format represents the output format
+	format string
 
-	// outputTarget represents the output target
-	// Default: stdout  todo(cbrgm): make me configurable
-	outputTarget io.ReadWriteCloser
+	// writer represents the output target
+	writer io.Writer
 
 	// metrics represents promcheck metrics
 	metrics metrics.Metrics
 }
 
 // NewBuilder returns a new Builder.
-func NewBuilder(outputFormat string, noColor bool, metrics metrics.Metrics) *Builder {
-	color.NoColor = noColor
-	if outputFormat == "" {
-		outputFormat = DefaultFormat
+func NewBuilder(opts ...BuilderOption) *Builder {
+	b := &Builder{
+		Report:  Report{},
+		format:  DefaultFormat,
+		writer:  os.Stdout,
+		metrics: metrics.NewDefaultPrometheus(),
 	}
-	return &Builder{
-		Report:       Report{},
-		outputFormat: outputFormat,
-		outputTarget: os.Stdout,
-		metrics:      metrics,
+	for _, opt := range opts {
+		opt(b)
+	}
+	return b
+}
+
+type BuilderOption func(*Builder)
+
+func WithFormat(format string) BuilderOption {
+	return func(b *Builder) {
+		b.format = format
+	}
+}
+
+// WithoutColor passing this BuilderOption to the NewBuilder disables terminal color.
+func WithoutColor() BuilderOption {
+	return func(b *Builder) {
+		color.NoColor = true
+	}
+}
+
+// WithWriter specifies a custom io.Writer to write to.
+// By default, os.Stdout is used.
+func WithWriter(w io.Writer) BuilderOption {
+	return func(b *Builder) {
+		b.writer = w
+	}
+}
+
+// WithMetrics configures the Builder to use custom specified metrics.
+func WithMetrics(metrics metrics.Metrics) BuilderOption {
+	return func(b *Builder) {
+		b.metrics = metrics
 	}
 }
 
@@ -178,13 +207,11 @@ func (b *Builder) Dump() error {
 		return errors.New("nothing to report")
 	}
 	var err error
-	switch b.outputFormat {
+	switch b.format {
 	case YAMLFormat:
 		err = b.DumpYAML()
 	case JSONFormat:
 		err = b.DumpJSON()
-	case DefaultFormat:
-		err = b.DumpTree()
 	case PrometheusFormat:
 		err = b.DumpPrometheusMetrics()
 	default:
@@ -200,7 +227,7 @@ func (b *Builder) DumpYAML() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(b.outputTarget, "%v\n", res)
+	fmt.Fprintf(b.writer, "%v\n", res)
 	return nil
 }
 
@@ -211,7 +238,7 @@ func (b *Builder) DumpJSON() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(b.outputTarget, "%v\n", res)
+	fmt.Fprintf(b.writer, "%v\n", res)
 	return nil
 }
 
@@ -222,7 +249,7 @@ func (b *Builder) DumpTree() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(b.outputTarget, "%v\n", res)
+	fmt.Fprintf(b.writer, "%v\n", res)
 	return nil
 }
 
