@@ -16,7 +16,6 @@ const (
 )
 
 type (
-
 	// Tree represents tree structure.
 	Tree interface {
 		AddNode(text string) Tree
