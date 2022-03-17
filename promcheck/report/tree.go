@@ -17,7 +17,7 @@ const (
 
 type (
 
-	// Tree represents tree structure
+	// Tree represents tree structure.
 	Tree interface {
 		AddNode(text string) Tree
 		AddSubtree(tree Tree)
@@ -26,18 +26,17 @@ type (
 		Print() string
 	}
 
-	// node implements Tree
+	// node implements Tree.
 	node struct {
 		text  string
 		nodes []Tree
 	}
 
-	// treePrinter traverses the tree and prints the results
-	treePrinter struct {
-	}
+	// treePrinter traverses the tree and prints the results.
+	treePrinter struct{}
 )
 
-//newNode returns a new Tree structure
+// newNode returns a new Tree structure.
 func newNode(text string) Tree {
 	return &node{
 		text:  text,
@@ -45,39 +44,39 @@ func newNode(text string) Tree {
 	}
 }
 
-//AddNode adds a node to the node
+// AddNode adds a node to the node.
 func (t *node) AddNode(text string) Tree {
 	n := newNode(text)
 	t.nodes = append(t.nodes, n)
 	return n
 }
 
-//AddSubtree adds a tree as an node
+// AddSubtree adds a tree as an node.
 func (t *node) AddSubtree(tree Tree) {
 	t.nodes = append(t.nodes, tree)
 }
 
-//Text returns the node's value
+// Text returns the node's value.
 func (t *node) String() string {
 	return t.text
 }
 
-//Nodes returns all nodes in the current node
+// Nodes returns all nodes in the current node.
 func (t *node) Nodes() []Tree {
 	return t.nodes
 }
 
-//Print returns an a text representation of the node
+// Print returns an a text representation of the node.
 func (t *node) Print() string {
 	return newPrinter().printTree(t)
 }
 
-// newPrinter returns a pointer to treePrinter
+// newPrinter returns a pointer to treePrinter.
 func newPrinter() *treePrinter {
 	return &treePrinter{}
 }
 
-//Print prints a node to a string
+// Print prints a node to a string.
 func (p *treePrinter) printTree(t Tree) string {
 	return t.String() + newLine + p.printNodes(t.Nodes(), []bool{})
 }
@@ -129,7 +128,7 @@ func (p *treePrinter) printNodes(t []Tree, spaces []bool) string {
 	return result
 }
 
-// ToTree returns the report as a tree structure in text format
+// ToTree returns the report as a tree structure in text format.
 func (b *Builder) ToTree() (string, error) {
 	b.finalize()
 	// translate slice of Sections into a map structure
@@ -138,7 +137,6 @@ func (b *Builder) ToTree() (string, error) {
 		failed  []string
 	})
 	for _, section := range b.Report.Sections {
-
 		if nodeMap[section.File] == nil {
 			nodeMap[section.File] = make(map[string]map[string]struct {
 				success []string
@@ -154,13 +152,8 @@ func (b *Builder) ToTree() (string, error) {
 
 		results := nodeMap[section.File][section.Group][section.Name]
 
-		for _, s := range section.Results {
-			results.success = append(results.success, s)
-		}
-
-		for _, s := range section.NoResults {
-			results.failed = append(results.failed, s)
-		}
+		results.success = append(results.success, section.Results...)
+		results.failed = append(results.failed, section.NoResults...)
 
 		nodeMap[section.File][section.Group][section.Name] = results
 	}
@@ -168,19 +161,16 @@ func (b *Builder) ToTree() (string, error) {
 	// finally build the tree
 	root := newNode(".")
 	for file, groups := range nodeMap {
-
 		// tree depth 1: files
 		prefixedFile := fmt.Sprintf("%s %s", color.YellowString("%s", "[file]"), file)
 		fileNode := newNode(prefixedFile)
 
 		for group, rules := range groups {
-
 			// tree depth 2: groups
 			group := fmt.Sprintf("%s %s", color.YellowString("%s", "[group]"), group)
 			groupNode := newNode(group)
 
 			for rule, results := range rules {
-
 				// three depth 3: rules
 				prefixedRule := fmt.Sprintf(
 					"%s %s",

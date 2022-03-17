@@ -2,17 +2,17 @@ package metrics
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 	"net/http/pprof"
 	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const defaultMetricsPath = "/metrics"
 
 // Options for initializing metrics collection.
 type Options struct {
-
 	// Common prefix for the keys of the different
 	// collected metrics.
 	Prefix string

@@ -4,31 +4,31 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/cbrgm/promcheck/promcheck/metrics"
 	"io"
 	"os"
 
 	"github.com/fatih/color"
 	"gopkg.in/yaml.v3"
+
+	"github.com/cbrgm/promcheck/promcheck/metrics"
 )
 
 const (
-	// DefaultFormat dumps Report as Text
+	// DefaultFormat dumps Report as Text.
 	DefaultFormat = "graph"
 
-	// YAMLFormat dumps Report as YAML
+	// YAMLFormat dumps Report as YAML.
 	YAMLFormat = "yaml"
 
-	// JSONFormat dumps Report as JSON
+	// JSONFormat dumps Report as JSON.
 	JSONFormat = "json"
 
-	// PrometheusFormat converts Report to Prometheus metrics
+	// PrometheusFormat converts Report to Prometheus metrics.
 	PrometheusFormat = "prometheus"
 )
 
-// Builder represents the report
+// Builder represents the report.
 type Builder struct {
-
 	// Report represents the report data
 	Report Report `json:"promcheck" yaml:"promcheck"`
 
@@ -43,7 +43,7 @@ type Builder struct {
 	metrics metrics.Metrics
 }
 
-// NewBuilder returns a new Builder
+// NewBuilder returns a new Builder.
 func NewBuilder(outputFormat string, noColor bool, metrics metrics.Metrics) *Builder {
 	color.NoColor = noColor
 	if outputFormat == "" {
@@ -57,9 +57,8 @@ func NewBuilder(outputFormat string, noColor bool, metrics metrics.Metrics) *Bui
 	}
 }
 
-// Report represents report data
+// Report represents report data.
 type Report struct {
-
 	// Sections represents a list of result data
 	Sections Sections `json:"results,omitempty" yaml:"results,omitempty"`
 
@@ -85,9 +84,8 @@ type Report struct {
 // Sections represents a collection of sections.
 type Sections []Section
 
-// Section represents a report section
+// Section represents a report section.
 type Section struct {
-
 	// File represents the file name of the checked rule
 	File string `json:"file" yaml:"file"`
 
@@ -126,8 +124,8 @@ func (b *Builder) clear() {
 	b.Report = Report{}
 }
 
-// AddSection adds a new section to the report
-func (b *Builder) AddSection(file, group, name, expression string, failed []string, success []string) {
+// AddSection adds a new section to the report.
+func (b *Builder) AddSection(file, group, name, expression string, failed, success []string) {
 	b.Report.Sections = append(b.Report.Sections, Section{
 		File:       file,
 		Group:      group,
@@ -136,7 +134,7 @@ func (b *Builder) AddSection(file, group, name, expression string, failed []stri
 		NoResults:  failed,
 		Results:    success,
 	})
-	b.Report.SectionsCount += 1
+	b.Report.SectionsCount++
 	b.Report.TotalSelectorsFailed += len(failed)
 	b.Report.TotalSelectorsSuccess += len(success)
 }

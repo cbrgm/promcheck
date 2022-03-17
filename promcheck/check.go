@@ -2,9 +2,10 @@ package promcheck
 
 import (
 	"fmt"
-	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"regexp"
 	"time"
+
+	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 
 	"github.com/prometheus/prometheus/model/labels"
 	promql "github.com/prometheus/prometheus/promql/parser"
@@ -12,12 +13,11 @@ import (
 
 // PrometheusRulesCheckerConfig represents PrometheusRulesChecker configuration.
 type PrometheusRulesCheckerConfig struct {
-
 	// ProbeDelay represents the delay between selector probes
 	ProbeDelay time.Duration
 
-	// PrometheusUrl represents the Prometheus instance url
-	PrometheusUrl string
+	// PrometheusURL represents the Prometheus instance url
+	PrometheusURL string
 
 	// IgnoredSelectorsRegexp represents a list of ignored selector regexp
 	// This parameter can be used to exclude selectors from probes
@@ -40,7 +40,6 @@ type PrometheusRulesChecker struct {
 
 // RuleGroup models a rule group that contains a set of recording and alerting rules.
 type RuleGroup struct {
-
 	// Name represents the name of the rule group
 	Name string `json:"name"`
 
@@ -53,7 +52,6 @@ type RuleGroup struct {
 
 // Rule describes an alerting or recording rule.
 type Rule struct {
-
 	// Name represents the checked recording rule or alert name
 	Name string `json:"name"`
 
@@ -61,7 +59,7 @@ type Rule struct {
 	Expression string `json:"expr"`
 }
 
-// CheckResult represents a check result
+// CheckResult represents a check result.
 type CheckResult struct {
 	// File represents the checked file name
 	File string
@@ -82,12 +80,12 @@ type CheckResult struct {
 	NoResults []string
 }
 
-//NewPrometheusRulesChecker returns PrometheusRulesChecker
+// NewPrometheusRulesChecker returns PrometheusRulesChecker.
 func NewPrometheusRulesChecker(config PrometheusRulesCheckerConfig, client prometheusv1.API) *PrometheusRulesChecker {
 	return &PrometheusRulesChecker{
 		probe: newPrometheusProbe(
 			config.ProbeDelay,
-			config.PrometheusUrl,
+			config.PrometheusURL,
 			client,
 		),
 		ignoredSelectorsRegexp: config.IgnoredSelectorsRegexp,
@@ -163,7 +161,6 @@ func isIgnored(ignoredRegexp []string, selector string) bool {
 // probeSelectorResults probes the given PromQL expression string for selectors without a result value.
 // probeSelectorResults returns a list of successful selectors and failed selectors.
 func (prc *PrometheusRulesChecker) probeSelectorResults(promqlExpression string) ([]string, []string, error) {
-
 	selectorsWithoutResult := []string{}
 	selectorsWithResult := []string{}
 
@@ -190,6 +187,9 @@ func (prc *PrometheusRulesChecker) probeSelectorResults(promqlExpression string)
 			break
 		}
 		val, err := prc.probe.ProbeSelector(selector)
+		if err != nil {
+			return selectorsWithResult, selectorsWithoutResult, err
+		}
 		if val < 1 {
 			selectorsWithoutResult = append(selectorsWithoutResult, selector)
 		} else {
@@ -199,12 +199,12 @@ func (prc *PrometheusRulesChecker) probeSelectorResults(promqlExpression string)
 	return selectorsWithResult, selectorsWithoutResult, nil
 }
 
-// visit is a helper struct to traverse a PromQL expression's abstract syntax tree
+// visit is a helper struct to traverse a PromQL expression's abstract syntax tree.
 type visit struct {
 	vectorSelectors []string
 }
 
-// Visit implements Visitor interface
+// Visit implements Visitor interface.
 func (v *visit) Visit(node promql.Node, _ []promql.Node) (promql.Visitor, error) {
 	if node == nil {
 		return v, nil
@@ -235,7 +235,7 @@ func getVectorSelectorsFromExpression(promqlExpression string) ([]string, error)
 }
 
 // ignoreMatchers checks whether the given matchers are ignored.
-// ignoreMatchers returns true if the matchers are ignored, false otherwise
+// ignoreMatchers returns true if the matchers are ignored, false otherwise.
 func ignoreMatchers(matchers []*labels.Matcher) bool {
 	for _, m := range matchers {
 		if m.Name != "__name__" {

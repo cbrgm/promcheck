@@ -2,16 +2,18 @@ package main
 
 import (
 	"context"
-	"github.com/cbrgm/promcheck/promcheck/metrics"
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
-	"github.com/oklog/run"
-	"github.com/pkg/errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
+	"github.com/oklog/run"
+
+	"github.com/cbrgm/promcheck/promcheck/metrics"
 )
 
 func (app *promcheckApp) runPromcheckExporter() error {
@@ -34,7 +36,7 @@ func (app *promcheckApp) runPromcheckExporter() error {
 		}))
 
 		s := http.Server{
-			Addr:    app.optExporterHttpAddr,
+			Addr:    app.optExporterHTTPAddr,
 			Handler: m,
 		}
 
@@ -84,7 +86,7 @@ func (app *promcheckApp) runPromcheckExporter() error {
 		})
 	}
 	{
-		sig := make(chan os.Signal)
+		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 		gr.Add(func() error {
 			<-sig
@@ -96,7 +98,7 @@ func (app *promcheckApp) runPromcheckExporter() error {
 	}
 
 	if err := gr.Run(); err != nil {
-		return errors.Errorf("error running: %s", err)
+		return fmt.Errorf("error running: %w", err)
 	}
 	return nil
 }

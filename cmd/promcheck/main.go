@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 )
 
 const (
@@ -30,9 +30,8 @@ var (
 )
 
 type config struct {
-
-	// PrometheusUrl represents the URL prometheus is running at. Required.
-	PrometheusUrl string `required:"true" name:"prometheus.url" default:"http://0.0.0.0:9090" help:"The Prometheus base url"`
+	// PrometheusURL represents the URL prometheus is running at. Required.
+	PrometheusURL string `required:"true" name:"prometheus.url" default:"http://0.0.0.0:9090" help:"The Prometheus base url"`
 
 	// check parameters
 	CheckIgnoredSelectorsRegexp []string `name:"check.ignore-selector" help:"Regexp of selectors to ignore"`
@@ -46,7 +45,7 @@ type config struct {
 
 	// exporter parameters
 	ExporterModeEnabled          bool   `name:"exporter.enabled" default:"false" help:"Run promcheck as a prometheus exporter"`
-	ExporterHttpAddr             string `name:"exporter.addr" default:"0.0.0.0:9093" help:"The address the http server is running at"`
+	ExporterHTTPAddr             string `name:"exporter.addr" default:"0.0.0.0:9093" help:"The address the http server is running at"`
 	ExporterInterval             int    `name:"exporter.interval" default:"300" help:"Delay in seconds between promcheck runs"`
 	ExporterEnableProfiling      bool   `name:"metrics.profile" default:"true" help:"Enable pprof profiling"`
 	ExporterEnableRuntimeMetrics bool   `name:"metrics.runtime" default:"true" help:"Enable runtime metrics"`
