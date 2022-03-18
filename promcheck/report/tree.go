@@ -170,7 +170,7 @@ func (b *Builder) ToTree() (string, error) {
 			groupNode := newNode(group)
 
 			for rule, results := range rules {
-				// three depth 3: rules
+				// tree depth 3: rules
 				prefixedRule := fmt.Sprintf(
 					"%s %s",
 					color.YellowString(
@@ -182,7 +182,7 @@ func (b *Builder) ToTree() (string, error) {
 				)
 				ruleNode := newNode(prefixedRule)
 
-				// three dept 4: selectors
+				// tree dept 4: selectors
 				for _, i := range results.success {
 					prefixedSuccess := color.GreenString("%s %s", "[✔]", i)
 					ruleNode.AddNode(prefixedSuccess)
