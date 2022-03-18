@@ -60,7 +60,6 @@ func NewBuilder(opts ...BuilderOption) *Builder {
 // BuilderOption represents builder options.
 type BuilderOption func(*Builder)
 
-
 // WithFormat sets the builder's output format.
 func WithFormat(format string) BuilderOption {
 	return func(b *Builder) {

@@ -18,9 +18,16 @@ clean:
 	$(GO) clean -i ./...
 	rm -rf ./bin/
 
-.PHONY: fmt
-fmt:
+.PHONY: format
+format: go/fmt go/lint
+
+.PHONY: go/fmt
+go/fmt:
 	$(GO) fmt $(PACKAGES)
+
+.PHONY: go/lint
+go/lint:
+	golangci-lint run
 
 .PHONY: test
 test:
