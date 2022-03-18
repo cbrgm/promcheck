@@ -26,6 +26,25 @@ referenced selectors out of it and probes them against a remote Prometheus insta
 <br>
 </div>
 
+---
+* [About](#about)
+* [Installation](#installation)
+* [Basic Usage](#basic-usage)
+    + [Use-Cases](#use-cases)
+    + [Validate rules from a running Prometheus instance](#validate-rules-from-a-running-prometheus-instance)
+    + [Validate rules from existing rule files](#validate-rules-from-existing-rule-files)
+    + [Prometheus Exporter](#prometheus-exporter)
+* [Configuration](#configuration)
+    + [Usage Information](#usage-information)
+    + [Output formats](#output-formats)
+* [Container Usage](#container-usage)
+* [Kubernetes Deployment](#kubernetes-deployment)
+* [Metrics](#metrics)
+* [Examples](#examples)
+    - [Basic Example validating multiple rule groups](#basic-example-validating-multiple-rule-groups)
+* [Contributing & License](#contributing---license)
+---
+
 ## Installation
 
 `promcheck` is available on Linux, OSX and Windows platforms. Binaries for Linux, Windows and Mac are available as
@@ -34,16 +53,24 @@ tarballs in the [release](https://github.com/cbrgm/promcheck/releases) page.
 You may also build `promcheck` from source (using Go 1.17+). In order to build `promcheck` from source you must:
 
 * Clone this repository
-* Run `make install`
+* Run `make build`
 
 ## Basic Usage
 
 `promcheck` can be used in two different modes:
 
-* validate rules from existing rule files (and export results in various formats)
-* validate rules from a running Prometheus instance (and export results in various formats)
+* Validate rules from existing rule files (and export results in various formats)
+* Validate rules from a running Prometheus instance (and export results in various formats)
 
 `promcheck` can also be executed as a Prometheus exporter to check a set of rules on a regular basis and export results as scrapeable Prometheus metrics via http.
+
+### Use-Cases
+
+What can you do with this? Possible **use-cases** might be:
+
+* 🛠 Run `promcheck` manually as a cli tool to check rules.
+* 🤖 Add `promcheck` to your CI/CD automation pipeline to run integration tests on your rules.
+* 📃 Run `promcheck` as an exporter, scrape its metrics and alert in case selectors do not return results anymore.
 
 ### Validate rules from a running Prometheus instance
 
@@ -81,17 +108,21 @@ promcheck --prometheus.url="http://0.0.0.0:9090" \
 
 </details>
 
-### Run `promcheck` as a Prometheus exporter
+### Prometheus Exporter
 
 ```bash
-# run promcheck as a prometheus exporter.
+# example: run promcheck as a prometheus exporter.
 # promcheck will validate all rules from the remote instance.
+promcheck --prometheus.url="http://0.0.0.0:9090" \
+          --exporter.enabled=true
+          
+# example: bind on port 9093, run promcheck every 5 min (300 sec.)
 promcheck --prometheus.url="http://0.0.0.0:9090" \
           --exporter.enabled=true \ 
           --exporter.interval=300 \
           --exporter.addr=0.0.0.0:9093
 
-# run promcheck as a prometheus exporter.
+# example: run promcheck as a prometheus exporter.
 # promcheck will validate all rules from the rules.yaml file  
 promcheck --prometheus.url="http://0.0.0.0:9090" \
           --exporter.enabled=true \ 
@@ -108,7 +139,7 @@ Argument Reference:
 * `--exporter.addr` - The exporter's http address
 * `--exporter.interval` - The interval in minutes to run `promcheck` and update metrics
 
-### Configuration
+## Configuration
 
 For a full list of flags, please also use `promcheck --help`.
 
@@ -138,7 +169,7 @@ Flags:
 export TERM=xterm-256color
 ```
 
-#### Usage Information
+### Usage Information
 
 Keep in mind that `promcheck` may also contain **false positives**, since there may be vector selectors in rules that
 intentionally do not return a result value.
@@ -155,7 +186,7 @@ Right now, the following output formats are supported:
 
 There might be more formats in near future. Feel free to contribute!
 
-### Container Usage
+## Container Usage
 
 `promcheck` can also be executed from within a container. The latest container image of `promcheck` is hosted
 on [quay.io](https://quay.io/repository/cbrgm/promcheck). 
@@ -172,11 +203,34 @@ To run `promcheck` from within a container as a Prometheus exporter, run:
 docker run --rm -p 9093:9093 quay.io/cbrgm/promcheck:latest --prometheus.url='http://0.0.0.0:9090' --exporter.enabled
 ```
 
-### Kubernetes Deployment
+## Kubernetes Deployment
 
 `promcheck` can be executed as a Prometheus exporter to validate a set of rules on a regular basis. Please refer to the [kubernetes.yaml](https://github.com/cbrgm/promcheck/blob/main/kubernetes.yaml) file for a basic deployment example.
 
-### Examples
+## Metrics
+
+* `promcheck_validation_rule_groups_total` - (Gauge) Total number of evaluated rule groups. 
+* `promcheck_validation_rules_total` - (Gauge) Total number of evaluated rules.
+* `promcheck_validation_selectors_total` - (Gauge) Total number of evaluated selectors. Label selectors:
+  * `file` - The rules file
+  * `group` - The rule group name
+  * `rule` - The rule name
+  * `status` - The status `failed` or `success`
+    
+**Example PromQL queries:**
+
+Total amount of selectors without result:
+```
+sum(promcheck_validation_selectors_total{status="failed"})
+```
+
+Total amount of selectors without result of rule `KubePodCrashLooping`:
+
+```
+promcheck_validation_selectors_total{rule="KubePodCrashLooping", status="failed"}
+```
+
+## Examples
 
 Please refer below for some basic usage examples demonstrating what `promcheck` can do for you!
 
@@ -355,11 +409,12 @@ Output json:
         ]
       }
     ],
+    "groups_total": 2,
     "rules_warnings": 3,
     "rules_total": 4,
     "selectors_success_total": 3,
     "selectors_failed_total": 1,
-    "ratio_failed_total": 25
+    "ratio_failed_total": 25.00
   }
 }
 ```
