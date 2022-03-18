@@ -257,7 +257,7 @@ groups:
           labels:
             severity: warning
           annotations:
-            summary: HighRequestLatency uses selectors without a result values.
+            summary: HighRequestLatency uses selectors without result values.
 ```
 
 </details>
