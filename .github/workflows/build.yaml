@@ -8,15 +8,19 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: checkout
         uses: actions/checkout@v3
-      - name: Install Go
+
+      - name: install Go
         uses: actions/setup-go@v2
         with:
           go-version: ^1.17
-      - name: Get modules
+
+      - name: get modules
         run: go mod vendor
-      - name: Test
+
+      - name: test
         run: make test
-      - name: Build
+
+      - name: build
         run: make build

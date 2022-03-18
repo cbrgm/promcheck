@@ -24,6 +24,7 @@ const (
 	JSONFormat = "json"
 
 	// PrometheusFormat converts Report to Prometheus metrics.
+	// This format is only used internally by Promcheck and cannot be set via cli flags.
 	PrometheusFormat = "prometheus"
 )
 
@@ -56,8 +57,10 @@ func NewBuilder(opts ...BuilderOption) *Builder {
 	return b
 }
 
+// BuilderOption represents builder options.
 type BuilderOption func(*Builder)
 
+// WithFormat sets the builder's output format.
 func WithFormat(format string) BuilderOption {
 	return func(b *Builder) {
 		b.format = format
@@ -144,11 +147,13 @@ func (b *Builder) HasContent() bool {
 	return b.Report.SectionsCount != 0
 }
 
+// finalize is called by format functions and calculates additional report data.
 func (b *Builder) finalize() {
 	totalSelectors := b.Report.TotalSelectorsFailed + b.Report.TotalSelectorsSuccess
 	b.Report.RatioFailedTotal = (float32(b.Report.TotalSelectorsFailed) / float32(totalSelectors)) * 100
 }
 
+// clear resets the report.
 func (b *Builder) clear() {
 	b.Report = Report{}
 }
@@ -163,13 +168,14 @@ func (b *Builder) AddSection(file, group, name, expression string, failed, succe
 		NoResults:  failed,
 		Results:    success,
 	})
+
 	b.Report.SectionsCount++
 	b.Report.TotalSelectorsFailed += len(failed)
 	b.Report.TotalSelectorsSuccess += len(success)
 }
 
 // AddTotalCheckedRules adds checked rules to the total amount.
-// TotalRules is used for report metrics.
+// Builder.TotalRules is used for report metrics.
 func (b *Builder) AddTotalCheckedRules(count int) {
 	b.Report.TotalRules += count
 }
