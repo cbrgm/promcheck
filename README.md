@@ -36,12 +36,12 @@ referenced selectors out of it and probes them against a remote Prometheus insta
     + [Prometheus Exporter](#prometheus-exporter)
 * [Configuration](#configuration)
     + [Usage Information](#usage-information)
-    + [Output formats](#output-formats)
+    + [Output Formats](#output-formats)
 * [Container Usage](#container-usage)
 * [Kubernetes Deployment](#kubernetes-deployment)
 * [Metrics](#metrics)
 * [Examples](#examples)
-    - [Basic Example validating multiple rule groups](#basic-example-validating-multiple-rule-groups)
+    - [Validating multiple rule groups](#basic-example-validating-multiple-rule-groups)
 * [Contributing & License](#contributing---license)
 ---
 
@@ -216,8 +216,11 @@ docker run --rm -p 9093:9093 quay.io/cbrgm/promcheck:latest --prometheus.url='ht
   * `group` - The rule group name
   * `rule` - The rule name
   * `status` - The status `failed` or `success`
-    
-**Example PromQL queries:**
+
+**Here are some basic examples**:
+
+<details>
+  <summary><b>Example: PromQL queries</b> Click to expand!</summary>
 
 Total amount of selectors without result:
 ```
@@ -229,6 +232,35 @@ Total amount of selectors without result of rule `KubePodCrashLooping`:
 ```
 promcheck_validation_selectors_total{rule="KubePodCrashLooping", status="failed"}
 ```
+
+</details>
+
+<details>
+  <summary><b>Example: Alert on selectors without a result</b> Click to expand!</summary>
+
+```yaml
+groups:
+  - name: example
+    rules:
+      # alert definition
+      - alert: HighRequestLatency
+        expr: job:request_latency_seconds:mean5m{job="myjob"} > 0.5
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: High request latency
+      # alert in case HighRequestLatency selectors are not returning results
+      - alert: HighRequestLatencyMissingMetrics
+          expr: promcheck_validation_selectors_total{rule="HighRequestLatency", status="failed"} > 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: HighRequestLatency uses selectors without a result values.
+```
+
+</details>
 
 ## Examples
 
