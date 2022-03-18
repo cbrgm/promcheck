@@ -26,7 +26,7 @@ referenced selectors out of it and probes them against a remote Prometheus insta
 <br>
 </div>
 
----
+## Overview
 * [About](#about)
 * [Installation](#installation)
 * [Basic Usage](#basic-usage)
@@ -43,7 +43,6 @@ referenced selectors out of it and probes them against a remote Prometheus insta
 * [Examples](#examples)
     - [Validating multiple rule groups](#basic-example-validating-multiple-rule-groups)
 * [Contributing & License](#contributing---license)
----
 
 ## Installation
 
