@@ -19,7 +19,7 @@ clean:
 	rm -rf ./bin/
 
 .PHONY: format
-format: go/fmt go/lint
+format: go/fmt
 
 .PHONY: go/fmt
 go/fmt:
