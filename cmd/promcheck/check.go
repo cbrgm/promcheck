@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"time"
 
@@ -38,10 +39,11 @@ type promcheckApp struct {
 	optPrometheusURL                string
 	optFilesRegexp                  string
 
-	check   Checker
-	report  Reporter
-	logger  log.Logger
-	metrics metrics.Metrics
+	check        Checker
+	report       Reporter
+	logger       log.Logger
+	metrics      metrics.Metrics
+	roundTripper http.RoundTripper
 }
 
 func newPromcheck(config *config, logger log.Logger) (*promcheckApp, error) {
@@ -50,7 +52,19 @@ func newPromcheck(config *config, logger log.Logger) (*promcheckApp, error) {
 		config.OutputFormat = report.PrometheusFormat
 	}
 
-	client, err := api.NewClient(api.Config{Address: config.PrometheusURL})
+	roundTripper := api.DefaultRoundTripper
+	if config.PrometheusBasicAuthUsername != "" && config.PrometheusBasicAuthPassword != "" {
+		roundTripper = NewBasicAuthRoundTripper(
+			config.PrometheusBasicAuthUsername,
+			config.PrometheusBasicAuthPassword,
+			api.DefaultRoundTripper,
+		)
+	}
+
+	client, err := api.NewClient(api.Config{
+		Address:      config.PrometheusURL,
+		RoundTripper: roundTripper,
+	})
 	if err != nil {
 		level.Error(logger).Log("msg", "failed to create Prometheus client", "err", err)
 		return nil, err
@@ -95,10 +109,11 @@ func newPromcheck(config *config, logger log.Logger) (*promcheckApp, error) {
 		optFilesRegexp:                  config.CheckFiles,
 
 		// internal
-		check:   checker,
-		report:  reporter,
-		logger:  logger,
-		metrics: promMetrics,
+		check:        checker,
+		report:       reporter,
+		logger:       logger,
+		metrics:      promMetrics,
+		roundTripper: roundTripper,
 	}, nil
 }
 
@@ -198,7 +213,10 @@ func rulefmtToPromcheck(fileName string, group rulefmt.RuleGroup) promcheck.Rule
 }
 
 func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
-	client, err := api.NewClient(api.Config{Address: app.optPrometheusURL})
+	client, err := api.NewClient(api.Config{
+		Address:      app.optPrometheusURL,
+		RoundTripper: app.roundTripper,
+	})
 	if err != nil {
 		level.Error(app.logger).Log("msg", "failed to create Prometheus client", "err", err)
 		return err
@@ -265,4 +283,24 @@ func prometheusv1ToPromcheck(group prometheusv1.RuleGroup) promcheck.RuleGroup {
 		}
 	}
 	return convertedRuleGroup
+}
+
+type basicAuthRoundTripper struct {
+	username string
+	password string
+	rt       http.RoundTripper
+}
+
+// NewBasicAuthRoundTripper will apply a BASIC auth authorization header to a
+// request unless it has already been set.
+func NewBasicAuthRoundTripper(username, password string, rt http.RoundTripper) http.RoundTripper {
+	return &basicAuthRoundTripper{username, password, rt}
+}
+
+func (rt *basicAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if len(req.Header.Get("Authorization")) != 0 {
+		return rt.rt.RoundTrip(req)
+	}
+	req.SetBasicAuth(rt.username, rt.password)
+	return rt.rt.RoundTrip(req)
 }

@@ -146,6 +146,8 @@ For a full list of flags, please also use `promcheck --help`.
 Flags:
   -h, --help                                               Show context-sensitive help.
       --prometheus.url="http://0.0.0.0:9090"               The Prometheus base url
+      --prometheus.basic-auth-user=""                      Basic auth username
+      --prometheus.basic-auth-pass=""                      Basic auth password
       --check.ignore-selector=CHECK.IGNORE-SELECTOR,...    Regexp of selectors to ignore
       --check.ignore-group=CHECK.IGNORE-GROUP,...          Regexp of rule groups to ignore
       --check.delay=0.1                                    Delay in seconds between probe requests
@@ -153,7 +155,7 @@ Flags:
       --output.format="graph"                              The output format to use
       --output.no-color                                    Toggle colored output
       --exporter.enabled                                   Run promcheck as a prometheus exporter
-      --exporter.addr="0.0.0:9093"                         The address the http server is running at
+      --exporter.addr="0.0.0.0:9093"                       The address the http server is running at
       --exporter.interval=300                              Delay in seconds between promcheck runs
       --metrics.profile                                    Enable pprof profiling
       --metrics.runtime                                    Enable runtime metrics
