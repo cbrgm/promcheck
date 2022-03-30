@@ -31,7 +31,9 @@ var (
 
 type config struct {
 	// PrometheusURL represents the URL prometheus is running at. Required.
-	PrometheusURL string `required:"true" name:"prometheus.url" default:"http://0.0.0.0:9090" help:"The Prometheus base url"`
+	PrometheusURL               string `required:"true" name:"prometheus.url" default:"http://0.0.0.0:9090" help:"The Prometheus base url"`
+	PrometheusBasicAuthUsername string `name:"prometheus.basic-auth-user" default:"" help:"Basic auth username"`
+	PrometheusBasicAuthPassword string `name:"prometheus.basic-auth-pass" default:"" help:"Basic auth password"`
 
 	// check parameters
 	CheckIgnoredSelectorsRegexp []string `name:"check.ignore-selector" help:"Regexp of selectors to ignore"`
