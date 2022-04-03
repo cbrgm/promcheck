@@ -40,6 +40,7 @@ type config struct {
 	CheckIgnoredGroupsRegexp    []string `name:"check.ignore-group" help:"Regexp of rule groups to ignore"`
 	CheckDelay                  float64  `name:"check.delay" default:"0.1" help:"Delay in seconds between probe requests"`
 	CheckFiles                  string   `name:"check.file" help:"The rule files to check."`
+	CheckExpressions            []string `name:"check.query" help:"Inline PromQL expression to check"`
 
 	// output parameters
 	OutputFormat  string `name:"output.format" enum:"graph,json,yaml,csv" default:"graph" help:"The output format to use"`

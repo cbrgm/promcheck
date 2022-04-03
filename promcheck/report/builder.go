@@ -94,9 +94,6 @@ type Report struct {
 	// Sections represents a list of result data
 	Sections Sections `json:"results,omitempty" yaml:"results,omitempty"`
 
-	// SectionsCount represents the length of Sections
-	SectionsCount int `json:"rules_warnings,omitempty" yaml:"rules_warnings,omitempty"`
-
 	// TotalRules represents the total amount of checked groups
 	TotalGroups int `json:"groups_total,omitempty" yaml:"groups_total,omitempty"`
 
@@ -144,7 +141,7 @@ func (s Report) Len() int {
 
 // HasContent checks if we actually have anything to report.
 func (b *Builder) HasContent() bool {
-	return b.Report.SectionsCount != 0
+	return b.Report.TotalRules != 0
 }
 
 // finalize is called by format functions and calculates additional report data.
@@ -169,15 +166,9 @@ func (b *Builder) AddSection(file, group, name, expression string, failed, succe
 		Results:    success,
 	})
 
-	b.Report.SectionsCount++
+	b.Report.TotalRules++
 	b.Report.TotalSelectorsFailed += len(failed)
 	b.Report.TotalSelectorsSuccess += len(success)
-}
-
-// AddTotalCheckedRules adds checked rules to the total amount.
-// Builder.TotalRules is used for report metrics.
-func (b *Builder) AddTotalCheckedRules(count int) {
-	b.Report.TotalRules += count
 }
 
 // AddTotalCheckedGroups adds checked groups to the total amount.

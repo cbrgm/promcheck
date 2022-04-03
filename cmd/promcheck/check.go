@@ -22,7 +22,6 @@ type Reporter interface {
 	Dump() error
 	AddSection(file, group, name, expression string, failed, success []string)
 	AddTotalCheckedGroups(count int)
-	AddTotalCheckedRules(count int)
 }
 
 type Checker interface {
@@ -38,6 +37,7 @@ type promcheckApp struct {
 	optExporterModeEnabled          bool
 	optPrometheusURL                string
 	optFilesRegexp                  string
+	optInlineExpressions            []string
 
 	check        Checker
 	report       Reporter
@@ -107,6 +107,7 @@ func newPromcheck(config *config, logger log.Logger) (*promcheckApp, error) {
 		optExporterModeEnabled:          config.ExporterModeEnabled,
 		optPrometheusURL:                config.PrometheusURL,
 		optFilesRegexp:                  config.CheckFiles,
+		optInlineExpressions:            config.CheckExpressions,
 
 		// internal
 		check:        checker,
@@ -125,6 +126,9 @@ func (app *promcheckApp) run() error {
 }
 
 func (app *promcheckApp) checkRules() error {
+	if len(app.optInlineExpressions) > 0 {
+		return app.checkRulesFromInlineQueries()
+	}
 	if app.optFilesRegexp != "" {
 		return app.checkRulesFromRuleFiles()
 	}
@@ -162,7 +166,6 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 		}
 		checkResults = append(checkResults, checked...)
 		app.report.AddTotalCheckedGroups(1)
-		app.report.AddTotalCheckedRules(len(group.Rules))
 	}
 	for _, cr := range checkResults {
 		app.report.AddSection(
@@ -247,7 +250,6 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 		}
 		checkResults = append(checkResults, checked...)
 		app.report.AddTotalCheckedGroups(1)
-		app.report.AddTotalCheckedRules(len(group.Rules))
 	}
 	for _, cr := range checkResults {
 		app.report.AddSection(
@@ -283,6 +285,42 @@ func prometheusv1ToPromcheck(group prometheusv1.RuleGroup) promcheck.RuleGroup {
 		}
 	}
 	return convertedRuleGroup
+}
+
+func (app *promcheckApp) checkRulesFromInlineQueries() error {
+	group := promcheck.RuleGroup{
+		Name:  "[inline]",
+		File:  "[manual]",
+		Rules: []promcheck.Rule{},
+	}
+	for i, query := range app.optInlineExpressions {
+		group.Rules = append(group.Rules, promcheck.Rule{
+			Name:       fmt.Sprintf("query-%d", i),
+			Expression: query,
+		})
+	}
+
+	checkResults := []promcheck.CheckResult{}
+	checked, err := app.check.CheckRuleGroup(group)
+	if err != nil {
+		level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
+		return err
+	}
+
+	checkResults = append(checkResults, checked...)
+	app.report.AddTotalCheckedGroups(1)
+
+	for _, cr := range checkResults {
+		app.report.AddSection(
+			cr.File,
+			cr.Group,
+			cr.Name,
+			cr.Expression,
+			cr.Results,
+			cr.NoResults,
+		)
+	}
+	return app.report.Dump()
 }
 
 type basicAuthRoundTripper struct {
