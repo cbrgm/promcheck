@@ -56,9 +56,10 @@ You may also build `promcheck` from source (using Go 1.17+). In order to build `
 
 ## Basic Usage
 
-`promcheck` can be used in two different modes:
+`promcheck` can be used in three different modes:
 
-* Validate rules from existing rule files (and export results in various formats)
+* Validate rules passed to `promcheck` as parameters (`--check.query`)
+* Validate rules from existing rule files (`--check.files`)
 * Validate rules from a running Prometheus instance (and export results in various formats)
 
 `promcheck` can also be executed as a Prometheus exporter to check a set of rules on a regular basis and export results as scrapeable Prometheus metrics via http.
@@ -152,6 +153,7 @@ Flags:
       --check.ignore-group=CHECK.IGNORE-GROUP,...          Regexp of rule groups to ignore
       --check.delay=0.1                                    Delay in seconds between probe requests
       --check.file=STRING                                  The rule files to check.
+      --check.query=CHECK.QUERY,...                        Inline PromQL expression to check
       --output.format="graph"                              The output format to use
       --output.no-color                                    Toggle colored output
       --exporter.enabled                                   Run promcheck as a prometheus exporter
