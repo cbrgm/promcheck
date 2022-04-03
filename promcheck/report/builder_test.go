@@ -49,7 +49,7 @@ func TestBuilder_DumpJSON(t *testing.T) {
         ]
       }
     ],
-    "rules_warnings": 1,
+    "rules_total": 1,
     "selectors_success_total": 4
   }
 }`
@@ -97,7 +97,7 @@ Selectors total: 0, Results found: 0, No Results found 0 (No Results/Total: NaN%
             ├── [✔] node_filesystem_readonly{fstype!="",job="node"}
             └── [✖] node_filesystem_avail_bytes{fstype!="",job="node"}
 
-Groups total: 0, Rules total: 0
+Groups total: 0, Rules total: 1
 Selectors total: 4, Results found: 3, No Results found 1 (No Results/Total: 25.00%)
 `
 
