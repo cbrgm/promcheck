@@ -1,5 +1,11 @@
 # promcheck ✔️
 
+<img
+  src=".img/logo.png"
+  width="150px"
+  align="right"
+/>
+
 **A tool to identify faulty [Prometheus](https://prometheus.io/) rules**
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/cbrgm/promcheck)](https://goreportcard.com/report/github.com/cbrgm/promcheck)
@@ -33,6 +39,7 @@ referenced selectors out of it and probes them against a remote Prometheus insta
     + [Use-Cases](#use-cases)
     + [Validate rules from a running Prometheus instance](#validate-rules-from-a-running-prometheus-instance)
     + [Validate rules from existing rule files](#validate-rules-from-existing-rule-files)
+    + [Validate rules from inline PromQL queries](#validate-rules-from-inline-promql-queries)
     + [Prometheus Exporter](#prometheus-exporter)
 * [Configuration](#configuration)
     + [Usage Information](#usage-information)
@@ -107,6 +114,17 @@ promcheck --prometheus.url="http://0.0.0.0:9090" \
 ```
 
 </details>
+
+### Validate rules from inline PromQL queries
+
+```bash
+promcheck --prometheus.url="http://0.0.0.0:9090" --check.query='up{job="alertmanager-main",namespace="monitoring"}'
+```
+
+Argument Reference:
+
+* `--prometheus.url` - The Prometheus instance to probe selectors against
+* `--check.query` - Inline PromQL expression (can be passed multiple times)
 
 ### Prometheus Exporter
 
