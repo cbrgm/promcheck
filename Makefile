@@ -40,7 +40,7 @@ build: \
 .PHONY: cmd/promcheck/promcheck
 cmd/promcheck/promcheck:
 	mkdir -p bin
-	$(GO) build -v -ldflags '-w $(LDFLAGS)' -o ./bin/promcheck ./cmd/promcheck
+	$(GO) build -v -ldflags '-w $(LDFLAGS)' -o ./bin/$(EXECUTABLE) ./cmd/$(EXECUTABLE)
 
 .PHONY: release
 release:
@@ -50,4 +50,10 @@ release:
 
 .PHONY: container
 container:
-	docker build -t $(IMAGE):latest .
+	podman build -t $(IMAGE):$(shell git describe --tags --abbrev=0) .
+	podman build -t $(IMAGE):latest .
+
+.PHONY: container-push
+container-push: container
+	podman push $(IMAGE):$(shell git describe --tags --abbrev=0)
+    podman push $(IMAGE):latest
