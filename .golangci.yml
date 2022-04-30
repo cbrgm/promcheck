@@ -30,7 +30,7 @@ linters-settings:
   errcheck:
     exclude: ./.errcheck_excludes.txt
   goimports:
-    local-prefixes: github.com/parca-dev/parca
+    local-prefixes: github.com/cbrgm/promcheck
   gofumpt:
     extra-rules: true
   misspell:
