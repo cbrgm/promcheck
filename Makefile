@@ -56,4 +56,4 @@ container:
 .PHONY: container-push
 container-push: container
 	podman push $(IMAGE):$(shell git describe --tags --abbrev=0)
-    podman push $(IMAGE):latest
+	podman push $(IMAGE):latest
