@@ -57,6 +57,9 @@ type config struct {
 	// log parameters
 	LogJSON  bool   `name:"log.json" default:"false" help:"Tell promcheck to log json and not key value pairs"`
 	LogLevel string `name:"log.level" default:"info" enum:"error,warn,info,debug" help:"The log level to use for filtering logs"`
+
+	// etc
+	StrictMode bool `name:"strict" default:"false" help:"Tell promcheck to exit with an error code on expressions without results"`
 }
 
 func main() {

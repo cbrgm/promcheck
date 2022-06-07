@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -38,6 +39,7 @@ type promcheckApp struct {
 	optPrometheusURL                string
 	optFilesRegexp                  string
 	optInlineExpressions            []string
+	optStrictMode                   bool
 
 	check        Checker
 	report       Reporter
@@ -108,6 +110,7 @@ func newPromcheck(config *config, logger log.Logger) (*promcheckApp, error) {
 		optPrometheusURL:                config.PrometheusURL,
 		optFilesRegexp:                  config.CheckFiles,
 		optInlineExpressions:            config.CheckExpressions,
+		optStrictMode:                   config.StrictMode,
 
 		// internal
 		check:        checker,
@@ -167,15 +170,26 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 		checkResults = append(checkResults, checked...)
 		app.report.AddTotalCheckedGroups(1)
 	}
+	hasExpressionsWithoutResult := false
 	for _, cr := range checkResults {
 		app.report.AddSection(
 			cr.File,
 			cr.Group,
 			cr.Name,
 			cr.Expression,
-			cr.Results,
 			cr.NoResults,
+			cr.Results,
 		)
+		if len(cr.NoResults) > 0 {
+			hasExpressionsWithoutResult = true
+		}
+	}
+	if hasExpressionsWithoutResult && app.optStrictMode {
+		app.report.Dump()
+		if err != nil {
+			level.Error(app.logger).Log("msg", "failed to print report", "err", err)
+		}
+		os.Exit(1)
 	}
 	return app.report.Dump()
 }
@@ -251,15 +265,27 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 		checkResults = append(checkResults, checked...)
 		app.report.AddTotalCheckedGroups(1)
 	}
+
+	hasExpressionsWithoutResult := false
 	for _, cr := range checkResults {
 		app.report.AddSection(
 			cr.File,
 			cr.Group,
 			cr.Name,
 			cr.Expression,
-			cr.Results,
 			cr.NoResults,
+			cr.Results,
 		)
+		if len(cr.NoResults) > 0 {
+			hasExpressionsWithoutResult = true
+		}
+	}
+	if hasExpressionsWithoutResult && app.optStrictMode {
+		app.report.Dump()
+		if err != nil {
+			level.Error(app.logger).Log("msg", "failed to print report", "err", err)
+		}
+		os.Exit(1)
 	}
 	return app.report.Dump()
 }
@@ -310,15 +336,26 @@ func (app *promcheckApp) checkRulesFromInlineQueries() error {
 	checkResults = append(checkResults, checked...)
 	app.report.AddTotalCheckedGroups(1)
 
+	hasExpressionsWithoutResult := false
 	for _, cr := range checkResults {
 		app.report.AddSection(
 			cr.File,
 			cr.Group,
 			cr.Name,
 			cr.Expression,
-			cr.Results,
 			cr.NoResults,
+			cr.Results,
 		)
+		if len(cr.NoResults) > 0 {
+			hasExpressionsWithoutResult = true
+		}
+	}
+	if hasExpressionsWithoutResult && app.optStrictMode {
+		app.report.Dump()
+		if err != nil {
+			level.Error(app.logger).Log("msg", "failed to print report", "err", err)
+		}
+		os.Exit(1)
 	}
 	return app.report.Dump()
 }

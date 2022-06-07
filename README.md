@@ -43,6 +43,7 @@ referenced selectors out of it and probes them against a remote Prometheus insta
     + [Prometheus Exporter](#prometheus-exporter)
 * [Configuration](#configuration)
     + [Usage Information](#usage-information)
+    + [CI/CD Usage](#cicd-usage)
     + [Output Formats](#output-formats)
 * [Container Usage](#container-usage)
 * [Kubernetes Deployment](#kubernetes-deployment)
@@ -182,6 +183,7 @@ Flags:
       --metrics.prefix=""                                  Set metrics prefix path
       --log.json                                           Tell promcheck to log json and not key value pairs
       --log.level="info"                                   The log level to use for filtering logs
+      --strict                                             Tell promcheck to exit with an error code on expressions without results
 ```
 
 `promcheck` uses 256 colors terminal mode. On 'nix OS system make sure the `TERM` environment variable is set.
@@ -196,6 +198,12 @@ Keep in mind that `promcheck` may also contain **false positives**, since there 
 intentionally do not return a result value.
 
 `promcheck` does a single HTTP request per vector selector to be probed against the remote Prometheus instance. With many rules to validate, execution time can take longer and lead to many HTTP requests. The interval between probes can be changed with the `--check.delay` flag, which results in fewer requests but increases the runtime of the tool.
+
+### CI/CD Usage
+
+`promcheck` has a flag `--strict`, which causes `promcheck` to terminate with error code `1` after a successful run if expressions without a result value were found.
+
+Therefore, `--strict` should be used, depending on the use case whether `promcheck` should fail the report step during a CI/CD workflow in case of expressions without a result, or whether the step should run successfully regardless of whether expressions have results or not.
 
 ### Output formats
 
