@@ -124,8 +124,8 @@ func (prc *PrometheusRulesChecker) CheckRuleGroup(group RuleGroup) ([]CheckResul
 			Name:       rule.Name,
 			Group:      group.Name,
 			Expression: rule.Expression,
-			Results:    failed,
-			NoResults:  success,
+			Results:    success,
+			NoResults:  failed,
 		}
 		results = append(results, result)
 	}
