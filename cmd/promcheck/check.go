@@ -185,7 +185,7 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 		}
 	}
 	if hasExpressionsWithoutResult && app.optStrictMode {
-		app.report.Dump()
+		err := app.report.Dump()
 		if err != nil {
 			level.Error(app.logger).Log("msg", "failed to print report", "err", err)
 		}
@@ -281,7 +281,7 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 		}
 	}
 	if hasExpressionsWithoutResult && app.optStrictMode {
-		app.report.Dump()
+		err := app.report.Dump()
 		if err != nil {
 			level.Error(app.logger).Log("msg", "failed to print report", "err", err)
 		}
@@ -351,7 +351,7 @@ func (app *promcheckApp) checkRulesFromInlineQueries() error {
 		}
 	}
 	if hasExpressionsWithoutResult && app.optStrictMode {
-		app.report.Dump()
+		err := app.report.Dump()
 		if err != nil {
 			level.Error(app.logger).Log("msg", "failed to print report", "err", err)
 		}
