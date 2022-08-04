@@ -46,7 +46,9 @@ cmd/promcheck/promcheck:
 release:
 	GOOS=windows GOARCH=amd64 go build -v -ldflags '-w $(LDFLAGS)' -o ./bin/$(EXECUTABLE)_windows_amd64 ./cmd/promcheck
 	GOOS=linux GOARCH=amd64 go build -v -ldflags '-w $(LDFLAGS)' -o ./bin/$(EXECUTABLE)_linux_amd64 ./cmd/promcheck
+	GOOS=linux GOARCH=arm64 go build -v -ldflags '-w $(LDFLAGS)' -o ./bin/$(EXECUTABLE)_linux_arm64 ./cmd/promcheck
 	GOOS=darwin GOARCH=amd64 go build -v -ldflags '-w $(LDFLAGS)' -o ./bin/$(EXECUTABLE)_darwin_amd64 ./cmd/promcheck
+	GOOS=darwin GOARCH=arm64 go build -v -ldflags '-w $(LDFLAGS)' -o ./bin/$(EXECUTABLE)_darwin_arm64 ./cmd/promcheck
 
 .PHONY: container
 container:

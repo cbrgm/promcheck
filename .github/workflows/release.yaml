@@ -27,7 +27,9 @@ jobs:
       - name: Package
         run: |
           rsync ./bin/promcheck_darwin_amd64 README.md LICENSE promcheck_darwin_amd64 && tar czvf promcheck_darwin_amd64.tar.gz promcheck_darwin_amd64
+          rsync ./bin/promcheck_darwin_arm64 README.md LICENSE promcheck_darwin_arm64 && tar czvf promcheck_darwin_arm64.tar.gz promcheck_darwin_arm64
           rsync ./bin/promcheck_linux_amd64 README.md LICENSE promcheck_linux_amd64 && tar czvf promcheck_linux_amd64.tar.gz promcheck_linux_amd64
+          rsync ./bin/promcheck_linux_arm64 README.md LICENSE promcheck_linux_arm64 && tar czvf promcheck_linux_arm64.tar.gz promcheck_linux_arm64
           rsync ./bin/promcheck_windows_amd64 README.md LICENSE promcheck_windows_amd64 && tar czvf promcheck_windows_amd64.tar.gz promcheck_windows_amd64
       - name: Release
         uses: softprops/action-gh-release@8a65c813553f4d05769635eb1b70180d25b9b61b
@@ -35,5 +37,7 @@ jobs:
         with:
           files: |
             promcheck_darwin_amd64.tar.gz
+            promcheck_darwin_arm64.tar.gz
             promcheck_linux_amd64.tar.gz
+            promcheck_linux_arm64.tar.gz
             promcheck_windows_amd64.tar.gz
