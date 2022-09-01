@@ -32,7 +32,7 @@ jobs:
           rsync ./bin/promcheck_linux_arm64 README.md LICENSE promcheck_linux_arm64 && tar czvf promcheck_linux_arm64.tar.gz promcheck_linux_arm64
           rsync ./bin/promcheck_windows_amd64 README.md LICENSE promcheck_windows_amd64 && tar czvf promcheck_windows_amd64.tar.gz promcheck_windows_amd64
       - name: Release
-        uses: softprops/action-gh-release@8a65c813553f4d05769635eb1b70180d25b9b61b
+        uses: softprops/action-gh-release@1e07f4398721186383de40550babbdf2b84acfc5
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
