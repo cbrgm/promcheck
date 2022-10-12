@@ -18,7 +18,7 @@ jobs:
         with:
           ## golang v1.18 breaks golangci-lint <= v1.45
           ## ref: https://github.com/golangci/golangci-lint/issues/2374#issuecomment-1069029422
-          go-version: '1.17'
+          go-version: '1.19'
       - uses: actions/checkout@v3
 
       - name: format
@@ -27,4 +27,4 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3.2.0
         with:
-          version: v1.44
+          version: v1.49
