@@ -63,8 +63,8 @@ type config struct {
 }
 
 func main() {
-	config := config{}
-	_ = kong.Parse(&config,
+	cfg := config{}
+	_ = kong.Parse(&cfg,
 		kong.Name("promcheck"),
 		kong.Description(
 			fmt.Sprintf(
@@ -85,29 +85,29 @@ func main() {
 	}
 
 	logger := log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
-	if config.LogJSON {
+	if cfg.LogJSON {
 		logger = log.NewJSONLogger(log.NewSyncWriter(os.Stderr))
 	}
 
-	logger = level.NewFilter(logger, levelFilter[config.LogLevel])
+	logger = level.NewFilter(logger, levelFilter[cfg.LogLevel])
 	logger = log.With(logger,
 		"ts", log.DefaultTimestampUTC,
 		"caller", log.DefaultCaller,
 	)
 
 	// validation
-	if config.ExporterInterval < 0 {
+	if cfg.ExporterInterval < 0 {
 		level.Error(logger).Log("msg", "configuration error", "err", "--exporter.interval must be > 0")
 		os.Exit(1)
 	}
 
-	if config.CheckDelay < 0 {
+	if cfg.CheckDelay < 0 {
 		level.Error(logger).Log("msg", "configuration error", "err", "--check.delay must be > 0")
 		os.Exit(1)
 	}
 
 	// initialize promcheck
-	app, err := newPromcheck(&config, logger)
+	app, err := newPromcheck(&cfg, logger)
 	if err != nil {
 		os.Exit(1)
 	}
