@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/go-kit/log"
@@ -160,16 +161,35 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 		return err
 	}
 
+	var wg sync.WaitGroup
 	checkResults := []promcheck.CheckResult{}
+	resultChan := make(chan promcheck.CheckResult, len(ruleGroupsToCheck))
+
 	for _, group := range ruleGroupsToCheck {
-		checked, err := app.check.CheckRuleGroup(group)
-		if err != nil {
-			level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
-			return err
-		}
-		checkResults = append(checkResults, checked...)
-		app.report.AddTotalCheckedGroups(1)
+		wg.Add(1)
+		go func(group promcheck.RuleGroup) {
+			defer wg.Done()
+			checked, err := app.check.CheckRuleGroup(group)
+			if err != nil {
+				level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
+				return
+			}
+			for _, res := range checked {
+				resultChan <- res
+			}
+			app.report.AddTotalCheckedGroups(1)
+		}(group)
 	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	for res := range resultChan {
+		checkResults = append(checkResults, res)
+	}
+
 	hasExpressionsWithoutResult := false
 	for _, cr := range checkResults {
 		app.report.AddSection(
@@ -255,15 +275,33 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 		return err
 	}
 
+	var wg sync.WaitGroup
 	checkResults := []promcheck.CheckResult{}
+	resultChan := make(chan promcheck.CheckResult, len(ruleGroupsToCheck))
+
 	for _, group := range ruleGroupsToCheck {
-		checked, err := app.check.CheckRuleGroup(group)
-		if err != nil {
-			level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
-			return err
-		}
-		checkResults = append(checkResults, checked...)
-		app.report.AddTotalCheckedGroups(1)
+		wg.Add(1)
+		go func(group promcheck.RuleGroup) {
+			defer wg.Done()
+			checked, err := app.check.CheckRuleGroup(group)
+			if err != nil {
+				level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
+				return
+			}
+			for _, res := range checked {
+				resultChan <- res
+			}
+			app.report.AddTotalCheckedGroups(1)
+		}(group)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	for res := range resultChan {
+		checkResults = append(checkResults, res)
 	}
 
 	hasExpressionsWithoutResult := false
