@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/api"
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/prometheus/model/rulefmt"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/cbrgm/promcheck/promcheck"
 	"github.com/cbrgm/promcheck/promcheck/metrics"
@@ -160,16 +161,39 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 		return err
 	}
 
+	var eg errgroup.Group
 	checkResults := []promcheck.CheckResult{}
+	resultChan := make(chan promcheck.CheckResult, len(ruleGroupsToCheck))
+
 	for _, group := range ruleGroupsToCheck {
-		checked, err := app.check.CheckRuleGroup(group)
-		if err != nil {
-			level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
-			return err
-		}
-		checkResults = append(checkResults, checked...)
-		app.report.AddTotalCheckedGroups(1)
+		group := group // https://golang.org/doc/faq#closures_and_goroutines
+		eg.Go(func() error {
+			checked, err := app.check.CheckRuleGroup(group)
+			if err != nil {
+				level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
+				return err
+			}
+			for _, res := range checked {
+				resultChan <- res
+			}
+			app.report.AddTotalCheckedGroups(1)
+			return nil
+		})
 	}
+
+	go func() {
+		if err := eg.Wait(); err != nil {
+			level.Error(app.logger).Log("msg", "failed to check rule groups", "err", err)
+			close(resultChan)
+			return
+		}
+		close(resultChan)
+	}()
+
+	for res := range resultChan {
+		checkResults = append(checkResults, res)
+	}
+
 	hasExpressionsWithoutResult := false
 	for _, cr := range checkResults {
 		app.report.AddSection(
@@ -255,17 +279,38 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 		return err
 	}
 
+	var eg errgroup.Group
 	checkResults := []promcheck.CheckResult{}
+	resultChan := make(chan promcheck.CheckResult, len(ruleGroupsToCheck))
+
 	for _, group := range ruleGroupsToCheck {
-		checked, err := app.check.CheckRuleGroup(group)
-		if err != nil {
-			level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
-			return err
-		}
-		checkResults = append(checkResults, checked...)
-		app.report.AddTotalCheckedGroups(1)
+		group := group // https://golang.org/doc/faq#closures_and_goroutines
+		eg.Go(func() error {
+			checked, err := app.check.CheckRuleGroup(group)
+			if err != nil {
+				level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
+				return err
+			}
+			for _, res := range checked {
+				resultChan <- res
+			}
+			app.report.AddTotalCheckedGroups(1)
+			return nil
+		})
 	}
 
+	go func() {
+		if err := eg.Wait(); err != nil {
+			level.Error(app.logger).Log("msg", "failed to check rule groups", "err", err)
+			close(resultChan)
+			return
+		}
+		close(resultChan)
+	}()
+
+	for res := range resultChan {
+		checkResults = append(checkResults, res)
+	}
 	hasExpressionsWithoutResult := false
 	for _, cr := range checkResults {
 		app.report.AddSection(

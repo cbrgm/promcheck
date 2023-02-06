@@ -3,6 +3,7 @@ package promcheck
 import (
 	"fmt"
 	"regexp"
+	"sync"
 	"time"
 
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -113,20 +114,33 @@ func (prc *PrometheusRulesChecker) CheckRuleGroups(groups []RuleGroup) ([]CheckR
 // CheckRuleGroup checks a single rule group.
 // CheckRuleGroup returns a list of CheckResult.
 func (prc *PrometheusRulesChecker) CheckRuleGroup(group RuleGroup) ([]CheckResult, error) {
+	var wg sync.WaitGroup
 	results := make([]CheckResult, 0, len(group.Rules))
+	resultCh := make(chan CheckResult, len(group.Rules))
 	for _, rule := range group.Rules {
-		success, failed, err := prc.probeSelectorResults(rule.Expression)
-		if err != nil {
-			return results, err
-		}
-		result := CheckResult{
-			File:       group.File,
-			Name:       rule.Name,
-			Group:      group.Name,
-			Expression: rule.Expression,
-			Results:    success,
-			NoResults:  failed,
-		}
+		rule := rule
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			success, failed, err := prc.probeSelectorResults(rule.Expression)
+			if err != nil {
+				return
+			}
+			resultCh <- CheckResult{
+				File:       group.File,
+				Name:       rule.Name,
+				Group:      group.Name,
+				Expression: rule.Expression,
+				Results:    success,
+				NoResults:  failed,
+			}
+		}()
+	}
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+	for result := range resultCh {
 		results = append(results, result)
 	}
 	return results, nil
