@@ -3,7 +3,7 @@ module github.com/cbrgm/promcheck
 go 1.19
 
 require (
-	github.com/alecthomas/kong v0.7.1
+	github.com/alecthomas/kong v0.8.0
 	github.com/fatih/color v1.15.0
 	github.com/go-kit/log v0.2.1
 	github.com/oklog/run v1.1.0
