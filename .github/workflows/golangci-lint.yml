@@ -14,7 +14,7 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           ## golang v1.18 breaks golangci-lint <= v1.45
           ## ref: https://github.com/golangci/golangci-lint/issues/2374#issuecomment-1069029422
