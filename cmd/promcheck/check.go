@@ -143,6 +143,7 @@ func (app *promcheckApp) checkRules() error {
 func (app *promcheckApp) checkRulesFromRuleFiles() error {
 	matches, err := filepath.Glob(app.optFilesRegexp)
 	if err != nil {
+		// nolint: errcheck
 		level.Error(app.logger).Log("msg", "failed to parse rule group file paths", "err", err)
 		return err
 	}
@@ -151,6 +152,7 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 	for _, file := range matches {
 		ruleGroups, err := processFile(file)
 		if err != nil {
+			// nolint: errcheck
 			level.Error(app.logger).Log("msg", "failed to parse rule group files", "err", err)
 			return err
 		}
@@ -158,6 +160,7 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 	}
 
 	if len(ruleGroupsToCheck) == 0 {
+		// nolint: errcheck
 		level.Error(app.logger).Log("msg", "no rule groups to check. Please check for --check.file flag spelling mistakes")
 		return err
 	}
@@ -171,6 +174,7 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 		eg.Go(func() error {
 			checked, err := app.check.CheckRuleGroup(group)
 			if err != nil {
+				// nolint: errcheck
 				level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
 				return err
 			}
@@ -184,6 +188,7 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 
 	go func() {
 		if err := eg.Wait(); err != nil {
+			// nolint: errcheck
 			level.Error(app.logger).Log("msg", "failed to check rule groups", "err", err)
 			close(resultChan)
 			return
@@ -212,6 +217,7 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 	if hasExpressionsWithoutResult && app.optStrictMode {
 		err := app.report.Dump()
 		if err != nil {
+			// nolint: errcheck
 			level.Error(app.logger).Log("msg", "failed to print report", "err", err)
 		}
 		os.Exit(1)
@@ -260,12 +266,14 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 		RoundTripper: app.roundTripper,
 	})
 	if err != nil {
+		// nolint: errcheck
 		level.Error(app.logger).Log("msg", "failed to create Prometheus client", "err", err)
 		return err
 	}
 	promAPI := prometheusv1.NewAPI(client)
 	apiResponse, err := promAPI.Rules(context.TODO()) // TODO: Can we somehow only load the ones we're interested in if filtered?
 	if err != nil {
+		// nolint: errcheck
 		level.Error(app.logger).Log("msg", "failed to receive rules from prometheus instance", "err", err)
 		return err
 	}
@@ -276,6 +284,7 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 	}
 
 	if len(ruleGroupsToCheck) == 0 {
+		// nolint: errcheck
 		level.Error(app.logger).Log("msg", "no rule groups to check. Please check whether the Prometheus instance contains any rules.")
 		return err
 	}
@@ -289,6 +298,7 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 		eg.Go(func() error {
 			checked, err := app.check.CheckRuleGroup(group)
 			if err != nil {
+				// nolint: errcheck
 				level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
 				return err
 			}
@@ -302,6 +312,7 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 
 	go func() {
 		if err := eg.Wait(); err != nil {
+			// nolint: errcheck
 			level.Error(app.logger).Log("msg", "failed to check rule groups", "err", err)
 			close(resultChan)
 			return
@@ -329,6 +340,7 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 	if hasExpressionsWithoutResult && app.optStrictMode {
 		err := app.report.Dump()
 		if err != nil {
+			// nolint: errcheck
 			level.Error(app.logger).Log("msg", "failed to print report", "err", err)
 		}
 		os.Exit(1)
@@ -375,6 +387,7 @@ func (app *promcheckApp) checkRulesFromInlineQueries() error {
 	checkResults := []promcheck.CheckResult{}
 	checked, err := app.check.CheckRuleGroup(group)
 	if err != nil {
+		// nolint: errcheck
 		level.Error(app.logger).Log("msg", "failed to check rule groups", "file", group.File, "err", err)
 		return err
 	}
@@ -399,6 +412,7 @@ func (app *promcheckApp) checkRulesFromInlineQueries() error {
 	if hasExpressionsWithoutResult && app.optStrictMode {
 		err := app.report.Dump()
 		if err != nil {
+			// nolint: errcheck
 			level.Error(app.logger).Log("msg", "failed to print report", "err", err)
 		}
 		os.Exit(1)

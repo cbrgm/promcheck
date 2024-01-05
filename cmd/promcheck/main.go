@@ -97,11 +97,13 @@ func main() {
 
 	// validation
 	if cfg.ExporterInterval < 0 {
+		// nolint: errcheck
 		level.Error(logger).Log("msg", "configuration error", "err", "--exporter.interval must be > 0")
 		os.Exit(1)
 	}
 
 	if cfg.CheckDelay < 0 {
+		// nolint: errcheck
 		level.Error(logger).Log("msg", "configuration error", "err", "--check.delay must be > 0")
 		os.Exit(1)
 	}
