@@ -1,37 +1,71 @@
+# golangci.com configuration
+# https://github.com/golangci/golangci/wiki/Configuration
+service:
+  # use the fixed version to not introduce new linters unexpectedly
+  golangci-lint-version: 1.54.1
+
 run:
+  # golang-ci lint runtime timeout
   deadline: 5m
-  skip-dirs:
-    - internal/go
+  # latest supported Go version
+  go: '1.21'
+  # see: https://golangci-lint.run/usage/configuration/
+  modules-download-mode: readonly
+  # include test files or not.
+  tests: false
 
 linters:
+  # Enable specific linter (not part of default linters)
+  # https://golangci-lint.run/usage/linters/#enabled-by-default-linters
   enable:
-    - depguard
-    - godot
+    # gofumpt as replacement for gofmt.
     - gofumpt
-    - goimports
+    # revive as replacement for golint.
     - revive
+    # whitespace to identify unnecessary whitespaces.
     - whitespace
+    # godot checks if all top-level comments contain a period at the end of the last sentence if needed.
+    - godot
+    # gocyclo calculates cyclomatic complexities of functions in Go source code.
+    - gocyclo
+    # gosec inspects source code for security problems by scanning the Go AST.
+    # - gosec
+    # wrapcheck is a Go linter to check that errors from external packages are wrapped
+    # - wrapcheck
+    # misspell checks for spelling mistakes
+    - misspell
 
 issues:
+  # independently of option `exclude` we use default exclude patterns
+  exclude-use-default: false
+  # excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
     - path: _test.go
       linters:
         - errcheck
 
 linters-settings:
-  depguard:
-    list-type: blacklist
-    include-go-root: true
-    packages-with-error-message:
-      - sync/atomic: "Use go.uber.org/atomic instead of sync/atomic"
-      - github.com/stretchr/testify/assert: "Use github.com/stretchr/testify/require instead of github.com/stretchr/testify/assert"
-      - github.com/go-kit/kit/log: "Use github.com/go-kit/log instead of github.com/go-kit/kit/log"
-      - github.com/pkg/errors: "Use fmt.Errorf instead"
-  errcheck:
-    exclude: ./.errcheck_excludes.txt
-  goimports:
-    local-prefixes: github.com/cbrgm/promcheck
+  # gofumpt settings
   gofumpt:
     extra-rules: true
+  # misspell settings
   misspell:
     locale: US
+  # revive settings
+  revive:
+    ignore-generated-header: true
+    severity: warning
+    rules:
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-return
+      - name: unexported-return
+        severity: warning
+        disabled: true
+  # gosec settings
+  gosec:
+    excludes:
+      # exclude random number check
+      - G404
+      # allowance of net/http serve function that has no support for setting timeouts
+      - G114
+  gocyclo:
+    min-complexity: 20

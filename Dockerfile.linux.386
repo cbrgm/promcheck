@@ -1,0 +1,10 @@
+FROM i386/alpine:3.19 AS build
+RUN apk add --no-cache ca-certificates
+
+FROM scratch
+
+ENTRYPOINT ["/usr/bin/promcheck"]
+
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+COPY bin/promcheck /usr/bin/promcheck

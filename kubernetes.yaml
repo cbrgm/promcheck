@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: promcheck-exporter
-          image: quay.io/cbrgm/promcheck:latest
+          image: ghcr.io/cbrgm/promcheck:latest
           imagePullPolicy: Always
           ports:
             - name: internal

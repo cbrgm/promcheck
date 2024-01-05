@@ -22,9 +22,11 @@ _cgo_export.*
 *.prof
 
 .idea
+coverage*
 
 /.env
 /dist/
 /vendor
 /results
 /bin
+/out
