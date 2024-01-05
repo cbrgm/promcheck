@@ -1,61 +1,164 @@
-EXECUTABLE ?= promcheck
-IMAGE ?= quay.io/cbrgm/$(EXECUTABLE)
-GO := CGO_ENABLED=0 go
-DATE := $(shell date -u '+%FT%T%z')
+SHELL := bash
+NAME := promcheck
+IMPORT := github.com/cbrgm/promcheck
+BIN := bin
+DIST := dist
 
-LDFLAGS += -X main.Version=$(shell git describe --tags --abbrev=0)
-LDFLAGS += -X main.Revision=$(shell git rev-parse --short=7 HEAD)
-LDFLAGS += -X "main.BuildDate=$(DATE)"
-LDFLAGS += -extldflags '-static'
+ifeq ($(OS), Windows_NT)
+	EXECUTABLE := $(NAME).exe
+	UNAME := Windows
+else
+	EXECUTABLE := $(NAME)
+	UNAME := $(shell uname -s)
+endif
 
-PACKAGES = $(shell go list ./...)
+GOBUILD ?= CGO_ENABLED=0 go build
+PACKAGES ?= $(shell go list ./...)
+SOURCES ?= $(shell find . -name "*.go" -type f)
+GENERATE ?= $(PACKAGES)
+
+TAGS ?=
+
+ifndef OUTPUT
+	ifeq ($(GITHUB_REF_TYPE), tag)
+		OUTPUT ?= $(subst v,,$(GITHUB_REF_NAME))
+	else
+		OUTPUT ?= testing
+	endif
+endif
+
+ifndef VERSION
+	ifeq ($(GITHUB_REF_TYPE), tag)
+		VERSION ?= $(subst v,,$(GITHUB_REF_NAME))
+	else
+		VERSION ?= $(shell git describe --tags --abbrev=0)-dirty
+	endif
+endif
+
+ifndef DATE
+	DATE := $(shell date -u '+%Y%m%d')
+endif
+
+ifndef SHA
+	SHA := $(shell git rev-parse --short HEAD)
+endif
+
+LDFLAGS += -s -w -extldflags "-static" -X "main.Version=$(VERSION)" -X "main.Revision=$(SHA)" -X "main.BuildDate=$(DATE)"
+GCFLAGS += all=-N -l
 
 .PHONY: all
 all: build
 
+.PHONY: sync
+sync:
+	go mod download
+
 .PHONY: clean
 clean:
-	$(GO) clean -i ./...
-	rm -rf ./bin/
+	go clean -i ./...
+	rm -rf $(BIN) $(DIST)
 
-.PHONY: format
-format: go/fmt
+.PHONY: fmt
+fmt:
+	gofmt -s -w $(SOURCES)
 
-.PHONY: go/fmt
-go/fmt:
-	$(GO) fmt $(PACKAGES)
+.PHONY: vet
+vet:
+	go vet $(PACKAGES)
 
-.PHONY: go/lint
-go/lint:
-	golangci-lint run
+.PHONY: lint
+lint:
+	golangci-lint run --out-format=github-actions --timeout 5m
+
+.PHONY: generate
+generate:
+	go generate $(GENERATE)
 
 .PHONY: test
 test:
-	@for PKG in $(PACKAGES); do $(GO) test -cover $$PKG || exit 1; done;
+	go test -coverprofile coverage.out $(PACKAGES)
+
+.PHONY: install
+install: $(SOURCES)
+	go install -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' ./cmd/$(NAME)
 
 .PHONY: build
-build: \
-	cmd/promcheck/promcheck
+build: $(BIN)/$(EXECUTABLE)
 
-.PHONY: cmd/promcheck/promcheck
-cmd/promcheck/promcheck:
-	mkdir -p bin
-	$(GO) build -v -ldflags '-w $(LDFLAGS)' -o ./bin/$(EXECUTABLE) ./cmd/$(EXECUTABLE)
+$(BIN)/$(EXECUTABLE): $(SOURCES)
+	$(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+$(BIN)/$(EXECUTABLE)-debug: $(SOURCES)
+	$(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -gcflags '$(GCFLAGS)' -o $@ ./cmd/$(NAME)
 
 .PHONY: release
-release:
-	GOOS=windows GOARCH=amd64 go build -v -ldflags '-w $(LDFLAGS)' -o ./bin/$(EXECUTABLE)_windows_amd64 ./cmd/promcheck
-	GOOS=linux GOARCH=amd64 go build -v -ldflags '-w $(LDFLAGS)' -o ./bin/$(EXECUTABLE)_linux_amd64 ./cmd/promcheck
-	GOOS=linux GOARCH=arm64 go build -v -ldflags '-w $(LDFLAGS)' -o ./bin/$(EXECUTABLE)_linux_arm64 ./cmd/promcheck
-	GOOS=darwin GOARCH=amd64 go build -v -ldflags '-w $(LDFLAGS)' -o ./bin/$(EXECUTABLE)_darwin_amd64 ./cmd/promcheck
-	GOOS=darwin GOARCH=arm64 go build -v -ldflags '-w $(LDFLAGS)' -o ./bin/$(EXECUTABLE)_darwin_arm64 ./cmd/promcheck
+release: $(DIST) release-linux release-darwin release-windows
 
-.PHONY: container
-container:
-	podman build -t $(IMAGE):$(shell git describe --tags --abbrev=0) .
-	podman build -t $(IMAGE):latest .
+$(DIST):
+	mkdir -p $(DIST)
 
-.PHONY: container-push
-container-push: container
-	podman push $(IMAGE):$(shell git describe --tags --abbrev=0)
-	podman push $(IMAGE):latest
+.PHONY: release-linux
+release-linux: $(DIST) \
+	$(DIST)/$(EXECUTABLE)_linux-386 \
+	$(DIST)/$(EXECUTABLE)_linux-amd64 \
+	$(DIST)/$(EXECUTABLE)_linux-arm-5 \
+	$(DIST)/$(EXECUTABLE)_linux-arm-6 \
+	$(DIST)/$(EXECUTABLE)_linux-arm-7 \
+	$(DIST)/$(EXECUTABLE)_linux-arm64 \
+	$(DIST)/$(EXECUTABLE)_linux-mips \
+	$(DIST)/$(EXECUTABLE)_linux-mips64 \
+	$(DIST)/$(EXECUTABLE)_linux-mipsle \
+	$(DIST)/$(EXECUTABLE)_linux-mips64le
+
+$(DIST)/$(EXECUTABLE)_linux-386:
+	GOOS=linux GOARCH=386 $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+$(DIST)/$(EXECUTABLE)_linux-amd64:
+	GOOS=linux GOARCH=amd64 $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+$(DIST)/$(EXECUTABLE)_linux-arm-5:
+	GOOS=linux GOARCH=arm GOARM=5 $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+$(DIST)/$(EXECUTABLE)_linux-arm-6:
+	GOOS=linux GOARCH=arm GOARM=6 $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+$(DIST)/$(EXECUTABLE)_linux-arm-7:
+	GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+$(DIST)/$(EXECUTABLE)_linux-arm64:
+	GOOS=linux GOARCH=arm64 $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+$(DIST)/$(EXECUTABLE)_linux-mips:
+	GOOS=linux GOARCH=mips $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+$(DIST)/$(EXECUTABLE)_linux-mips64:
+	GOOS=linux GOARCH=mips64 $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+$(DIST)/$(EXECUTABLE)_linux-mipsle:
+	GOOS=linux GOARCH=mipsle $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+$(DIST)/$(EXECUTABLE)_linux-mips64le:
+	GOOS=linux GOARCH=mips64le $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+.PHONY: release-darwin
+release-darwin: $(DIST) \
+	$(DIST)/$(EXECUTABLE)_darwin-amd64 \
+	$(DIST)/$(EXECUTABLE)_darwin-arm64
+
+$(DIST)/$(EXECUTABLE)_darwin-amd64:
+	GOOS=darwin GOARCH=amd64 $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+$(DIST)/$(EXECUTABLE)_darwin-arm64:
+	GOOS=darwin GOARCH=arm64 $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+.PHONY: release-windows
+release-windows: $(DIST) \
+	$(DIST)/$(EXECUTABLE)_windows-4.0-386.exe \
+	$(DIST)/$(EXECUTABLE)_windows-4.0-amd64.exe
+
+$(DIST)/$(EXECUTABLE)_windows-4.0-386.exe:
+	GOOS=windows GOARCH=386 $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+
+$(DIST)/$(EXECUTABLE)_windows-4.0-amd64.exe:
+	GOOS=windows GOARCH=amd64 $(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@ ./cmd/$(NAME)
+

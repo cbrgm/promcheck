@@ -23,7 +23,7 @@ func (app *promcheckApp) runPromcheckExporter() error {
 	{
 		httpLogger := log.With(app.logger, "component", "exporter")
 		m := http.NewServeMux()
-		handleHealth := func(w http.ResponseWriter, r *http.Request) {
+		handleHealth := func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}
 		m.HandleFunc("/health", handleHealth)
@@ -40,7 +40,7 @@ func (app *promcheckApp) runPromcheckExporter() error {
 			Handler: m,
 		}
 
-		m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		m.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = w.Write([]byte(`<html>
 			<head><title>Promcheck Exporter</title></head>
 			<body>
@@ -50,13 +50,14 @@ func (app *promcheckApp) runPromcheckExporter() error {
 			</html>`))
 		})
 		gr.Add(func() error {
+			// nolint: errcheck
 			level.Info(httpLogger).Log(
 				"msg", "running http server",
 				"addr", s.Addr,
 			)
 
 			return s.ListenAndServe()
-		}, func(err error) {
+		}, func(_ error) {
 			_ = s.Shutdown(context.TODO())
 		})
 	}
@@ -70,6 +71,7 @@ func (app *promcheckApp) runPromcheckExporter() error {
 				case <-ctx.Done():
 					return nil
 				case <-tick.C:
+					// nolint: errcheck
 					level.Info(app.logger).Log(
 						"msg", "executing promcheck routine",
 					)
@@ -79,6 +81,7 @@ func (app *promcheckApp) runPromcheckExporter() error {
 				}
 			}
 		}, func(err error) {
+			// nolint: errcheck
 			level.Info(app.logger).Log(
 				"msg", "error while executing promcheck routine",
 				"err", err,
@@ -91,7 +94,7 @@ func (app *promcheckApp) runPromcheckExporter() error {
 		gr.Add(func() error {
 			<-sig
 			return nil
-		}, func(err error) {
+		}, func(_ error) {
 			cancel()
 			close(sig)
 		})

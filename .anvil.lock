@@ -1,0 +1,90 @@
+{
+  "generated_at": "2024-01-05T19:47:09.507592+01:00",
+  "version": "v1.1.5-dirty",
+  "files": [
+    {
+      "path": ".editorconfig"
+    },
+    {
+      "path": ".github/FUNDING.yml"
+    },
+    {
+      "path": ".github/auto_assign.yml"
+    },
+    {
+      "path": ".github/issue_template.md"
+    },
+    {
+      "path": ".github/pull_request_template.md"
+    },
+    {
+      "path": ".github/renovate.json"
+    },
+    {
+      "path": ".github/settings.yml"
+    },
+    {
+      "path": ".github/workflows/autoassign.yml"
+    },
+    {
+      "path": ".github/workflows/automerge.yml"
+    },
+    {
+      "path": ".github/workflows/notify.yml"
+    },
+    {
+      "path": ".github/workflows/stale.yml"
+    },
+    {
+      "path": ".github/workflows/tag.yml"
+    },
+    {
+      "path": "CODEOWNERS"
+    },
+    {
+      "path": "CONTRIBUTING.md"
+    },
+    {
+      "path": "LICENSE"
+    },
+    {
+      "path": ".dockerignore"
+    },
+    {
+      "path": ".github/workflows/container.yml"
+    },
+    {
+      "path": ".github/workflows/go-binaries.yml"
+    },
+    {
+      "path": ".github/workflows/go-lint-test.yml"
+    },
+    {
+      "path": ".gitignore"
+    },
+    {
+      "path": ".golangci.yml"
+    },
+    {
+      "path": "Dockerfile.linux.386"
+    },
+    {
+      "path": "Dockerfile.linux.amd64"
+    },
+    {
+      "path": "Dockerfile.linux.arm"
+    },
+    {
+      "path": "Dockerfile.linux.arm64"
+    },
+    {
+      "path": "Makefile"
+    },
+    {
+      "path": "flake.lock"
+    },
+    {
+      "path": "flake.nix"
+    }
+  ]
+}

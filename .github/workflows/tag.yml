@@ -1,0 +1,69 @@
+---
+name: publish-release-tag
+
+on:
+  schedule:
+    - cron: '0 0 * * 0,1,3,5'  # At 00:00 (12 AM) on Sunday, Monday, Wednesday, and Friday
+
+  workflow_dispatch:
+    inputs:
+      bump-level:
+        required: true
+        type: choice
+        description: 'The semver bump level'
+        options:
+          - 'major'
+          - 'minor'
+          - 'patch'
+          - 'premajor'
+          - 'preminor'
+          - 'prepatch'
+          - 'prerelease'
+        default: 'patch'
+
+      prerelease-tag:
+        required: false
+        description: 'The tag to use for prereleases'
+        default: 'alpha'
+
+jobs:
+  publish-release-tag:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.BOT_PAT_TOKEN }}
+
+      - name: Get Latest Tag
+        id: current
+        run: |
+          git fetch --tags
+          latest_tag=$(git tag | sort -V | tail -n 1)
+          echo "current version is: $latest_tag"
+          echo "latest_tag=$latest_tag" >> $GITHUB_ENV
+
+      - name: Bump Version
+        id: bump-semver
+        uses: cbrgm/semver-bump-action@main
+        with:
+          current-version: ${{ env.latest_tag }}
+          bump-level: ${{ github.event.inputs.bump-level || 'patch' }}
+          prerelease-tag: ${{ github.event.inputs.prerelease-tag }}
+
+      - name: Publish Git Tag
+        run: |
+          git fetch --tags
+          latest_tag=$(git tag | sort -V | tail -n 1)
+          new_tag=${{ steps.bump-semver.outputs.new_version }}
+          if [[ $(git rev-list $latest_tag..HEAD --count) -gt 0 ]]; then
+            git config user.name "GitHub Actions"
+            git config user.email "github-actions@users.noreply.github.com"
+            git tag $new_tag
+            git push origin $new_tag
+          else
+            echo "No new commits since last tag. Skipping tag push. ($new_tag)"
+          fi
+
+...

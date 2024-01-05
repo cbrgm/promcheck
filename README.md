@@ -108,7 +108,7 @@ Argument Reference:
 # validate a rules file `rules.yaml`
 promcheck --prometheus.url="http://0.0.0.0:9090" \
           --check.file=rules.yaml
-          
+
 # validate all *.yaml files in directory ./config
 promcheck --prometheus.url="http://0.0.0.0:9090" \
           --check.file='./config/*.yaml'
@@ -134,17 +134,17 @@ Argument Reference:
 # promcheck will validate all rules from the remote instance.
 promcheck --prometheus.url="http://0.0.0.0:9090" \
           --exporter.enabled=true
-          
+
 # example: bind on port 9093, run promcheck every 5 min (300 sec.)
 promcheck --prometheus.url="http://0.0.0.0:9090" \
-          --exporter.enabled=true \ 
+          --exporter.enabled=true \
           --exporter.interval=300 \
           --exporter.addr=0.0.0.0:9093
 
 # example: run promcheck as a prometheus exporter.
-# promcheck will validate all rules from the rules.yaml file  
+# promcheck will validate all rules from the rules.yaml file
 promcheck --prometheus.url="http://0.0.0.0:9090" \
-          --exporter.enabled=true \ 
+          --exporter.enabled=true \
           --exporter.interval=300 \
           --exporter.addr=0.0.0.0:9093 \
           --check.file=rules.yaml
@@ -218,18 +218,18 @@ There might be more formats in near future. Feel free to contribute!
 ## Container Usage
 
 `promcheck` can also be executed from within a container. The latest container image of `promcheck` is hosted
-on [quay.io](https://quay.io/repository/cbrgm/promcheck). 
+on [ghcr.io](https://github.com/cbrgm/promcheck).
 
 To run `promcheck` from within a container (assuming that there is a rule file named `rules.yaml` in the current directory), run:
 
 ```bash
-docker run -v $(pwd):/tmp --rm quay.io/cbrgm/promcheck:latest --prometheus.url='http://0.0.0.0:9090' --check.file="/tmp/rules.yaml"
+docker run -v $(pwd):/tmp --rm ghcr.io/cbrgm/promcheck:latest --prometheus.url='http://0.0.0.0:9090' --check.file="/tmp/rules.yaml"
 ```
 
 To run `promcheck` from within a container as a Prometheus exporter, run:
 
 ```bash
-docker run --rm -p 9093:9093 quay.io/cbrgm/promcheck:latest --prometheus.url='http://0.0.0.0:9090' --exporter.enabled
+docker run --rm -p 9093:9093 ghcr.io/cbrgm/promcheck:latest --prometheus.url='http://0.0.0.0:9090' --exporter.enabled
 ```
 
 ## Kubernetes Deployment
@@ -238,7 +238,7 @@ docker run --rm -p 9093:9093 quay.io/cbrgm/promcheck:latest --prometheus.url='ht
 
 ## Metrics
 
-* `promcheck_validation_rule_groups_total` - (Gauge) Total number of evaluated rule groups. 
+* `promcheck_validation_rule_groups_total` - (Gauge) Total number of evaluated rule groups.
 * `promcheck_validation_rules_total` - (Gauge) Total number of evaluated rules.
 * `promcheck_validation_selectors_total` - (Gauge) Total number of evaluated selectors. Label selectors:
   * `file` - The rules file

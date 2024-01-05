@@ -1,0 +1,153 @@
+---
+name: container
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    if: ${{ github.actor != 'dependabot[bot]' }}
+
+    strategy:
+      matrix:
+        include:
+          - platform: linux/386
+            goos: linux
+            goarch: 386
+          - platform: linux/amd64
+            goos: linux
+            goarch: amd64
+          - platform: linux/arm/6
+            goos: linux
+            goarch: arm
+            goarm: 6
+          - platform: linux/arm64
+            goos: linux
+            goarch: arm64
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.BOT_PAT_TOKEN }}
+
+      - name: Setup golang
+        id: golang
+        uses: actions/setup-go@v5
+        with:
+          go-version: ^1.21
+
+      - name: Run generate
+        id: generate
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+        run: make generate
+
+      - name: Run build
+        id: build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+        run: make build
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/cbrgm/promcheck
+          labels: |
+            org.opencontainers.image.vendor=cbrgm
+            maintainer=Chris Bargmann <github@cbrgm.net>
+          tags: |
+            type=ref,event=pr
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+          flavor: |
+            suffix=-${{ matrix.goos }}-${{ matrix.goarch }}
+
+      - name: Setup qemu
+        id: qemu
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Ghcr login
+        id: login3
+        uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: cbrgm
+          password: ${{ secrets.BOT_PAT_TOKEN }}
+
+      - name: Build image
+        id: publish
+        uses: docker/build-push-action@v5
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: .
+          provenance: false
+          file: Dockerfile.${{ matrix.goos }}.${{ matrix.goarch }}
+          platforms: ${{ matrix.platform }}
+          push: ${{ github.event_name != 'pull_request' }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+
+  manifest:
+    runs-on: ubuntu-latest
+    needs: container
+    if: ${{ github.event_name != 'pull_request' && github.actor != 'dependabot[bot]' }}
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.BOT_PAT_TOKEN }}
+
+      - name: Ghcr tags
+        id: ghcrTags
+        if: github.event_name != 'pull_request'
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/cbrgm/promcheck
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+
+      - name: Ghcr manifest
+        id: ghcr
+        if: github.event_name != 'pull_request'
+        uses: actionhippie/manifest@v1
+        with:
+          username: cbrgm
+          password: ${{ secrets.BOT_PAT_TOKEN }}
+          platforms: linux/amd64,linux/386,linux/arm64,linux/arm/v6
+          template: ghcr.io/cbrgm/promcheck:VERSION-OS-ARCH
+          target: ${{ steps.ghcrTags.outputs.tags }}
+          ignore_missing: true
+
