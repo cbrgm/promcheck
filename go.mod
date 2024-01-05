@@ -9,7 +9,7 @@ require (
 	github.com/oklog/run v1.1.0
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/common v0.45.0
-	github.com/prometheus/prometheus v1.8.2-0.20211214150951-52c693a63be1
+	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/sync v0.5.0
 	gopkg.in/yaml.v3 v3.0.1
