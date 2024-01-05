@@ -49,6 +49,7 @@ type promcheckApp struct {
 	roundTripper http.RoundTripper
 }
 
+// nolint: errcheck
 func newPromcheck(config *config, logger log.Logger) (*promcheckApp, error) {
 	// write prometheus metrics when exporter mode is enabled
 	if config.ExporterModeEnabled {
