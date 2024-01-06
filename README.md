@@ -482,6 +482,8 @@ Output json:
 
 ## Contributing & License
 
-Feel free to submit changes! See
-the [Contributing Guide](https://github.com/cbrgm/contributing/blob/master/CONTRIBUTING.md). This project is open-source
-and is developed under the terms of the [Apache 2.0 License](https://github.com/cbrgm/promcheck/blob/master/LICENSE).
+We welcome and value your contributions to this project! 👍 If you're interested in making improvements or adding features, please refer to our [Contributing Guide](https://github.com/cbrgm/promcheck/blob/main/CONTRIBUTING.md). This guide provides comprehensive instructions on how to submit changes, set up your development environment, and more.
+
+Please note that this project is developed in my spare time and is available for free 🕒💻. As an open-source initiative, it is governed by the [Apache 2.0 License](https://github.com/cbrgm/promcheck/blob/main/LICENSE). This license outlines your rights and obligations when using, modifying, and distributing this software.
+
+Your involvement, whether it's through code contributions, suggestions, or feedback, is crucial for the ongoing improvement and success of this project. Together, we can ensure it remains a useful and well-maintained resource for everyone 🌍.
