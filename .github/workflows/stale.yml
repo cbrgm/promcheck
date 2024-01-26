@@ -26,4 +26,10 @@ jobs:
           days-before-stale: 14
           days-before-close: -1
           operations-per-run: 100
+      - name: Cleanup Stale Branches
+        uses: cbrgm/cleanup-stale-branches-action@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          dry-run: false
 ...
