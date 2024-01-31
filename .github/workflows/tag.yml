@@ -3,7 +3,7 @@ name: publish-release-tag
 
 on:
   schedule:
-    - cron: '0 0 * * 0,1,3,5'  # At 00:00 (12 AM) on Sunday, Monday, Wednesday, and Friday
+    - cron: '0 12 * * 5'  # At 12:00 (12 PM) every Friday
 
   workflow_dispatch:
     inputs:
@@ -65,5 +65,4 @@ jobs:
           else
             echo "No new commits since last tag. Skipping tag push. ($new_tag)"
           fi
-
 ...

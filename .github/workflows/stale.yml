@@ -1,8 +1,8 @@
 ---
-name: stale-issues-and-prs
-'on':
+name: stale-issues-prs-branches
+on:
   schedule:
-    - cron: 0 0/3 * * *
+    - cron: 0 0/6 * * *
 jobs:
   label-issues:
     runs-on: ubuntu-latest
