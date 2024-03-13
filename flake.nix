@@ -28,7 +28,7 @@
 
       packages = forAllSystems
         ({ pkgs }: {
-          default = pkgs.buildGo121Module
+          default = pkgs.buildGo122Module
             {
               name = "cmd";
               src = gitignore.lib.gitignoreSource ./.;
@@ -42,11 +42,12 @@
             shellHook = "exec zsh && echo Welcome to your Go dev shell!";
             packages = with pkgs; [
               gnumake
-              zsh
               go-mockery
+              go
+              gofumpt
               golangci-lint
-              go_1_21
               just
+              zsh
             ];
           };
         });
