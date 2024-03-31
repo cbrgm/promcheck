@@ -9,7 +9,7 @@ jobs:
   notify-on-release:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Telegram Notification on New Release
+      - name: Send Telegram Notification on new release
         uses: cbrgm/telegram-github-action@v1
         with:
           token: ${{ secrets.TELEGRAM_TOKEN }}
@@ -20,5 +20,17 @@ jobs:
             Tag: ${{ github.event.release.tag_name }}
             Actor: ${{ github.actor }}
             Repository: ${{ github.repository }}
+            Check it out: ${{ github.event.release.html_url }}
+
+      - name: Send Mastodon Status on new release
+        id: mastodon
+        uses: cbrgm/mastodon-github-action@v2
+        if: ${{ !github.event.repository.private }}
+        with:
+          access-token: ${{ secrets.MASTODON_ACCESS_TOKEN }}
+          url: ${{ secrets.MASTODON_URL }}
+          language: "en"
+          message: |
+            🚀  ${{ github.repository }} ${{ github.event.release.name }} published!
             Check it out: ${{ github.event.release.html_url }}
 ...
