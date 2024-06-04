@@ -259,4 +259,3 @@ func (b *Builder) DumpPrometheusMetrics() error {
 	}
 	return nil
 }
-
