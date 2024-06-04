@@ -224,7 +224,7 @@ func (b *Builder) DumpYAML() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(b.writer, "%v\n", res)
+	_, _ = fmt.Fprintf(b.writer, "%v\n", res)
 	return nil
 }
 
@@ -235,7 +235,7 @@ func (b *Builder) DumpJSON() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(b.writer, "%v\n", res)
+	_, _ = fmt.Fprintf(b.writer, "%v\n", res)
 	return nil
 }
 
@@ -246,7 +246,7 @@ func (b *Builder) DumpTree() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(b.writer, "%v\n", res)
+	_, _ = fmt.Fprintf(b.writer, "%v\n", res)
 	return nil
 }
 
@@ -259,3 +259,4 @@ func (b *Builder) DumpPrometheusMetrics() error {
 	}
 	return nil
 }
+
