@@ -68,7 +68,7 @@ vet:
 
 .PHONY: lint
 lint:
-	golangci-lint run --out-format=github-actions --timeout 5m
+	golangci-lint run --out-format=colored-line-number --timeout 5m
 
 .PHONY: generate
 generate:
