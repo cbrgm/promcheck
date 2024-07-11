@@ -30,7 +30,7 @@ jobs:
           check-latest: true
 
       - name: install golangci
-        uses: giantswarm/install-binary-action@v2.0.0
+        uses: giantswarm/install-binary-action@v3.0.0
         with:
           binary: "golangci-lint"
           version: "1.59.1"
