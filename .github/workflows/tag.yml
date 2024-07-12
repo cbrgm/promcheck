@@ -3,7 +3,7 @@ name: publish-release-tag
 
 on:
   schedule:
-    - cron: '0 12 * * 5'  # At 12:00 (12 PM) every Friday
+    - cron: '0 12 1 * *'  # At 12:00 (12 PM) on the 1st day of every month
 
   workflow_dispatch:
     inputs:
