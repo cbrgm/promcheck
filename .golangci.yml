@@ -2,13 +2,13 @@
 # https://github.com/golangci/golangci/wiki/Configuration
 service:
   # use the fixed version to not introduce new linters unexpectedly
-  golangci-lint-version: 1.59.1
+  golangci-lint-version: 1.60.1
 
 run:
   # golang-ci lint runtime timeout
   deadline: 5m
   # latest supported Go version
-  go: '1.22'
+  go: '1.23'
   # see: https://golangci-lint.run/usage/configuration/
   modules-download-mode: readonly
   # include test files or not.
