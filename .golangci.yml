@@ -2,7 +2,7 @@
 # https://github.com/golangci/golangci/wiki/Configuration
 service:
   # use the fixed version to not introduce new linters unexpectedly
-  golangci-lint-version: 1.64.3
+  golangci-lint-version: 1.64.5
 
 run:
   # golang-ci lint runtime timeout
