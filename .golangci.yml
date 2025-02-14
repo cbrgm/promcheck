@@ -8,7 +8,7 @@ run:
   # golang-ci lint runtime timeout
   deadline: 5m
   # latest supported Go version
-  go: '1.23'
+  go: '1.24'
   # see: https://golangci-lint.run/usage/configuration/
   modules-download-mode: readonly
   # include test files or not.
