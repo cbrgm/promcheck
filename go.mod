@@ -1,6 +1,8 @@
 module github.com/cbrgm/promcheck
 
-go 1.22.2
+go 1.23.0
+
+toolchain go1.24.1
 
 require (
 	github.com/alecthomas/kong v1.8.1
@@ -11,7 +13,7 @@ require (
 	github.com/prometheus/common v0.62.0
 	github.com/prometheus/prometheus v1.8.2-0.20211214150951-52c693a63be1
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/sync v0.11.0
+	golang.org/x/sync v0.12.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
