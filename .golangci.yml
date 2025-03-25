@@ -1,71 +1,54 @@
-# golangci.com configuration
-# https://github.com/golangci/golangci/wiki/Configuration
-service:
-  # use the fixed version to not introduce new linters unexpectedly
-  golangci-lint-version: 1.64.6
-
+version: "2"
 run:
-  # golang-ci lint runtime timeout
-  deadline: 5m
-  # latest supported Go version
-  go: '1.24'
-  # see: https://golangci-lint.run/usage/configuration/
+  go: 1.24
   modules-download-mode: readonly
-  # include test files or not.
   tests: false
-
 linters:
-  # Enable specific linter (not part of default linters)
-  # https://golangci-lint.run/usage/linters/#enabled-by-default-linters
   enable:
-    # gofumpt as replacement for gofmt.
-    - gofumpt
-    # revive as replacement for golint.
-    - revive
-    # whitespace to identify unnecessary whitespaces.
-    - whitespace
-    # godot checks if all top-level comments contain a period at the end of the last sentence if needed.
-    - godot
-    # gocyclo calculates cyclomatic complexities of functions in Go source code.
     - gocyclo
-    # gosec inspects source code for security problems by scanning the Go AST.
-    # - gosec
-    # wrapcheck is a Go linter to check that errors from external packages are wrapped
-    # - wrapcheck
-    # misspell checks for spelling mistakes
+    - godot
     - misspell
-
-issues:
-  # independently of option `exclude` we use default exclude patterns
-  exclude-use-default: false
-  # excluding configuration per-path, per-linter, per-text and per-source
-  exclude-rules:
-    - path: _test.go
-      linters:
-        - errcheck
-
-linters-settings:
-  # gofumpt settings
-  gofumpt:
-    extra-rules: true
-  # misspell settings
-  misspell:
-    locale: US
-  # revive settings
-  revive:
-    ignore-generated-header: true
-    severity: warning
+    - revive
+    - whitespace
+  settings:
+    gocyclo:
+      min-complexity: 20
+    gosec:
+      excludes:
+        - G404
+        - G114
+    misspell:
+      locale: US
+    revive:
+      severity: warning
+      rules:
+        - name: unexported-return
+          severity: warning
+          disabled: true
+  exclusions:
+    generated: lax
     rules:
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-return
-      - name: unexported-return
-        severity: warning
-        disabled: true
-  # gosec settings
-  gosec:
-    excludes:
-      # exclude random number check
-      - G404
-      # allowance of net/http serve function that has no support for setting timeouts
-      - G114
-  gocyclo:
-    min-complexity: 20
+      - linters:
+          - errcheck
+        path: _test.go
+    paths:
+      - cdk.out
+      - vendor
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofumpt
+  settings:
+    gofumpt:
+      extra-rules: true
+  exclusions:
+    generated: lax
+    paths:
+      - cdk.out
+      - vendor
+      - third_party$
+      - builtin$
+      - examples$
+
