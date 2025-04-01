@@ -26,6 +26,9 @@ on:
         description: 'The tag to use for prereleases'
         default: 'alpha'
 
+permissions:
+  contents: write
+
 jobs:
   publish-release-tag:
     runs-on: ubuntu-latest
