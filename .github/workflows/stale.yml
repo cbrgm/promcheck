@@ -3,6 +3,12 @@ name: stale-issues-prs-branches
 on:
   schedule:
     - cron: 0 0 * * *
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: write
+
 jobs:
   label-issues:
     runs-on: ubuntu-latest
@@ -17,6 +23,7 @@ jobs:
           days-before-close: 7
           operations-per-run: 100
           exempt-issue-labels: backlog
+
       - uses: actions/stale@v9
         name: Setting PR as idle
         with:
@@ -26,6 +33,7 @@ jobs:
           days-before-stale: 60
           days-before-close: 7
           operations-per-run: 100
+
       - name: Cleanup Stale Branches
         uses: cbrgm/cleanup-stale-branches-action@main
         with:

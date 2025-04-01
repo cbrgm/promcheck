@@ -5,6 +5,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
   notify-on-release:
     runs-on: ubuntu-latest
