@@ -2,7 +2,7 @@ module github.com/cbrgm/promcheck
 
 go 1.23.0
 
-toolchain go1.24.2
+toolchain go1.24.1
 
 require (
 	github.com/alecthomas/kong v1.10.0
@@ -56,7 +56,7 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/goleak v1.1.12 // indirect
-	golang.org/x/net v0.35.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
