@@ -26,8 +26,7 @@ jobs:
         id: golang
         uses: actions/setup-go@v5
         with:
-          go-version: ^1.24
-          check-latest: true
+          go-version-file: .go-version
 
       - name: install golangci
         uses: giantswarm/install-binary-action@v3.0.0
