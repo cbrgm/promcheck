@@ -22,11 +22,11 @@ jobs:
     steps:
       - name: Checkout source
         id: source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup golang
         id: golang
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: .go-version
 
@@ -39,7 +39,7 @@ jobs:
         run: make release
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           generate_release_notes: true
@@ -47,7 +47,7 @@ jobs:
           token: ${{ secrets.BOT_PAT_TOKEN }}
 
       - name: Update version
-        uses: nowactions/update-majorver@v1
+        uses: nowactions/update-majorver@f2014bbbba95b635e990ce512c5653bd0f4753fb # v1.1.2
         if: startsWith(github.ref, 'refs/tags/v')
 
 ...
