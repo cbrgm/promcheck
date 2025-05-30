@@ -1,4 +1,4 @@
-FROM arm64v8/alpine:3.21 AS build
+FROM arm64v8/alpine:3.22 AS build
 RUN apk add --no-cache ca-certificates
 
 FROM scratch
