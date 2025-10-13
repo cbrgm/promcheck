@@ -142,7 +142,7 @@ jobs:
       - name: Ghcr manifest
         id: ghcr
         if: github.event_name != 'pull_request'
-        uses: actionhippie/manifest@2c35d2899df72a33e3c9034a3417f571dc5995b8 # v1.6.2
+        uses: actionhippie/manifest@38d68034e59aa55e3d139d87f42408487ca747a8 # v1.6.3
         with:
           username: cbrgm
           password: ${{ secrets.BOT_PAT_TOKEN }}
