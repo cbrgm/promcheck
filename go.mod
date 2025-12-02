@@ -2,7 +2,7 @@ module github.com/cbrgm/promcheck
 
 go 1.24.0
 
-toolchain go1.25.4
+toolchain go1.25.5
 
 require (
 	github.com/alecthomas/kong v1.13.0
