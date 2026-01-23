@@ -34,7 +34,7 @@ jobs:
 
   renovate:
     runs-on: ubuntu-latest
-    if: github.actor == 'renovate[bot]'
+    if: github.actor == 'renovate[bot]' || github.actor == 'mend[bot]'
 
     steps:
       - name: Approve request
