@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send Telegram Notification on new release
-        uses: cbrgm/telegram-github-action@d6efb871ef28c3596400d750aa2df16a36d8865d # v1.3.12
+        uses: cbrgm/telegram-github-action@24a425df612604a1700c235e02b79c70916dde29 # v1.3.13
         with:
           token: ${{ secrets.TELEGRAM_TOKEN }}
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -27,7 +27,7 @@ jobs:
 
       - name: Send Mastodon Status on new release
         id: mastodon
-        uses: cbrgm/mastodon-github-action@3ebdc72dcd894e1be460179eb0d01835f3689b2f # v2.1.23
+        uses: cbrgm/mastodon-github-action@a4eea3d4ca4a297b4221c4f56500dc0e175824ce # v2.1.24
         if: ${{ !github.event.repository.private }}
         with:
           access-token: ${{ secrets.MASTODON_ACCESS_TOKEN }}
