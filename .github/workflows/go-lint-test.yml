@@ -32,7 +32,7 @@ jobs:
         uses: giantswarm/install-binary-action@c94c7adadeb14af4bdbdd601f9a6e7f69638134c # v4.0.0
         with:
           binary: "golangci-lint"
-          version: "2.8.0"
+          version: "2.9.0"
           download_url: "https://github.com/golangci/golangci-lint/releases/download/v${version}/golangci-lint-${version}-linux-amd64.tar.gz"
           tarball_binary_path: "*/${binary}"
           smoke_test: "${binary} --version"
