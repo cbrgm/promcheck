@@ -38,6 +38,17 @@ jobs:
         id: release
         run: make release
 
+      - name: Sign release
+        id: gpgsign
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: cbrgm/pgp-sign-artifact-action@v1
+        with:
+          private_key: ${{ secrets.GNUPG_KEY }}
+          passphrase: ${{ secrets.GNUPG_PASSWORD }}
+          detach_sign: true
+          files: dist/*
+          excludes: dist/*.sha256
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         if: startsWith(github.ref, 'refs/tags/')

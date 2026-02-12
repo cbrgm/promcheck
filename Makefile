@@ -92,7 +92,11 @@ $(BIN)/$(EXECUTABLE)-debug: $(SOURCES)
 	$(GOBUILD) -v -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -gcflags '$(GCFLAGS)' -o $@ ./cmd/$(NAME)
 
 .PHONY: release
-release: $(DIST) release-linux release-darwin release-windows
+release: $(DIST) release-linux release-darwin release-windows release-checksum
+
+.PHONY: release-checksum
+release-checksum:
+	cd $(DIST); $(foreach file,$(wildcard $(DIST)/$(EXECUTABLE)_*),sha256sum $(notdir $(file)) > $(notdir $(file)).sha256;)
 
 $(DIST):
 	mkdir -p $(DIST)
