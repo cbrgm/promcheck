@@ -57,8 +57,8 @@ jobs:
           files: "dist/*"
           token: ${{ secrets.BOT_PAT_TOKEN }}
 
-      - name: Update version
-        uses: nowactions/update-majorver@f2014bbbba95b635e990ce512c5653bd0f4753fb # v1.1.2
+      - name: Update version tags
+        uses: cbrgm/semver-tag-sync-action@v1
         if: startsWith(github.ref, 'refs/tags/v')
 
 ...
