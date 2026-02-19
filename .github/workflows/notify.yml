@@ -27,7 +27,7 @@ jobs:
 
       - name: Send Mastodon Status on new release
         id: mastodon
-        uses: cbrgm/mastodon-github-action@a4eea3d4ca4a297b4221c4f56500dc0e175824ce # v2.1.24
+        uses: cbrgm/mastodon-github-action@845250b56b82d94e26bf23984d5e0cf5ced6d18f # v2.1.25
         if: ${{ !github.event.repository.private }}
         with:
           access-token: ${{ secrets.MASTODON_ACCESS_TOKEN }}
