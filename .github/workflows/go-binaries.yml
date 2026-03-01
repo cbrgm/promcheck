@@ -41,7 +41,7 @@ jobs:
       - name: Sign release
         id: gpgsign
         if: startsWith(github.ref, 'refs/tags/')
-        uses: cbrgm/pgp-sign-artifact-action@19c64cf0078eb0ae818a8bd8ee925229f90d65db # v1.0.1
+        uses: cbrgm/pgp-sign-artifact-action@08a23454921d1c67af7301e520d4ef7efdc9ef25 # v1.0.2
         with:
           private_key: ${{ secrets.GNUPG_KEY }}
           passphrase: ${{ secrets.GNUPG_PASSWORD }}
@@ -58,7 +58,7 @@ jobs:
           token: ${{ secrets.BOT_PAT_TOKEN }}
 
       - name: Update version tags
-        uses: cbrgm/semver-tag-sync-action@df8221add71d981abcbbc28856531a4b0c0b906b # v1.0.1
+        uses: cbrgm/semver-tag-sync-action@390e6e14a7deaaecc0d628768dfc0fc1df34ca1c # v1.0.2
         if: startsWith(github.ref, 'refs/tags/v')
 
 ...
