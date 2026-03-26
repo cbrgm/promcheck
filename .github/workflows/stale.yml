@@ -35,7 +35,7 @@ jobs:
           operations-per-run: 100
 
       - name: Cleanup Stale Branches
-        uses: cbrgm/cleanup-stale-branches-action@main
+        uses: cbrgm/cleanup-stale-branches-action@aaa9bc79394d03adf2c5cecc1286c8d723c3b2d7 # main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
