@@ -49,7 +49,7 @@ jobs:
 
       - name: Bump Version
         id: bump-semver
-        uses: cbrgm/semver-bump-action@02d54d29bcf4541c99761dd1dc3f967586f22ad0 # main
+        uses: cbrgm/semver-bump-action@960b776eff759b3b9187208b7cb8209d9a66c044 # main
         with:
           current-version: ${{ env.latest_tag }}
           bump-level: ${{ github.event.inputs.bump-level || 'patch' }}
