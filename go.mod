@@ -5,7 +5,7 @@ go 1.25.0
 toolchain go1.26.1
 
 require (
-	github.com/alecthomas/kong v1.14.0
+	github.com/alecthomas/kong v1.15.0
 	github.com/fatih/color v1.19.0
 	github.com/go-kit/log v0.2.1
 	github.com/oklog/run v1.2.0
