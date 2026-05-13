@@ -29,7 +29,7 @@ jobs:
           go-version-file: .go-version
 
       - name: install golangci
-        uses: giantswarm/install-binary-action@c94c7adadeb14af4bdbdd601f9a6e7f69638134c # v4.0.0
+        uses: giantswarm/install-binary-action@5bef88f65012037dd836117c8d344b21bb559854 # v4.1.0
         with:
           binary: "golangci-lint"
           version: "2.11.4"
