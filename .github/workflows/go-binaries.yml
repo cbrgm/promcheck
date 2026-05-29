@@ -58,7 +58,7 @@ jobs:
           token: ${{ secrets.BOT_PAT_TOKEN }}
 
       - name: Update version tags
-        uses: cbrgm/semver-tag-sync-action@dc3fd41a0c5c35594c815757af016ea87eacca10 # v1.1.0
+        uses: cbrgm/semver-tag-sync-action@5c3ffb02969fa0e723f9b2b407955b950f37b883 # v1.1.1
         if: startsWith(github.ref, 'refs/tags/v')
 
 ...
