@@ -198,7 +198,7 @@ func (prc *PrometheusRulesChecker) probeSelectorResults(promqlExpression string)
 			return selectorsWithResult, selectorsWithoutResult, err
 		}
 		if ignoreMatchers(matchers) {
-			break
+			continue
 		}
 		val, err := prc.probe.ProbeSelector(selector)
 		if err != nil {
