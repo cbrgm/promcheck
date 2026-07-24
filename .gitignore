@@ -31,3 +31,6 @@ coverage*
 /results
 /bin
 /out
+
+# Local docs
+/docs/
