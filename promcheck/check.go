@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 
 	"github.com/prometheus/prometheus/model/labels"
@@ -114,34 +115,32 @@ func (prc *PrometheusRulesChecker) CheckRuleGroups(groups []RuleGroup) ([]CheckR
 // CheckRuleGroup checks a single rule group.
 // CheckRuleGroup returns a list of CheckResult.
 func (prc *PrometheusRulesChecker) CheckRuleGroup(group RuleGroup) ([]CheckResult, error) {
-	var wg sync.WaitGroup
-	results := make([]CheckResult, 0, len(group.Rules))
-	resultCh := make(chan CheckResult, len(group.Rules))
+	var (
+		mu      sync.Mutex
+		results = make([]CheckResult, 0, len(group.Rules))
+		eg      errgroup.Group
+	)
 	for _, rule := range group.Rules {
-		rule := rule
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		eg.Go(func() error {
 			success, failed, err := prc.probeSelectorResults(rule.Expression)
 			if err != nil {
-				return
+				return fmt.Errorf("rule %q: %w", rule.Name, err)
 			}
-			resultCh <- CheckResult{
+			mu.Lock()
+			results = append(results, CheckResult{
 				File:       group.File,
 				Name:       rule.Name,
 				Group:      group.Name,
 				Expression: rule.Expression,
 				Results:    success,
 				NoResults:  failed,
-			}
-		}()
+			})
+			mu.Unlock()
+			return nil
+		})
 	}
-	go func() {
-		wg.Wait()
-		close(resultCh)
-	}()
-	for result := range resultCh {
-		results = append(results, result)
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
 	return results, nil
 }

@@ -1,6 +1,7 @@
 package promcheck
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -238,4 +239,15 @@ func TestProbeSelectorResults_ContinuesAfterIgnoredMatcher(t *testing.T) {
 	require.Contains(t, fp.calls, `up{job="x"}`, "selector after the ignored ALERTS selector must still be probed")
 	require.Equal(t, []string{`up{job="x"}`}, success)
 	require.Empty(t, failed)
+}
+
+func TestCheckRuleGroup_PropagatesProbeError(t *testing.T) {
+	fp := &fakeProber{err: errors.New("boom")}
+	prc := &PrometheusRulesChecker{probe: fp}
+	group := RuleGroup{
+		Name:  "g",
+		Rules: []Rule{{Name: "r", Expression: `up{job="x"}`}},
+	}
+	_, err := prc.CheckRuleGroup(group)
+	require.Error(t, err)
 }
