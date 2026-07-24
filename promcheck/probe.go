@@ -35,7 +35,10 @@ func (p *prometheusProbe) probe(selector string) (float64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to query metrics: %w", err)
 	}
-	vec := value.(model.Vector)
+	vec, ok := value.(model.Vector)
+	if !ok {
+		return 0, fmt.Errorf("unexpected query result type %T for selector %q (wanted vector)", value, selector)
+	}
 	var metricValue float64
 	for _, v := range vec {
 		if v.Value.String() == "NaN" {
