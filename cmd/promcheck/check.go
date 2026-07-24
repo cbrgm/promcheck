@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -19,6 +20,9 @@ import (
 	"github.com/cbrgm/promcheck/promcheck/metrics"
 	"github.com/cbrgm/promcheck/promcheck/report"
 )
+
+// ErrNoRuleGroups is returned when a check run finds no rule groups to probe.
+var ErrNoRuleGroups = errors.New("no rule groups to check")
 
 type Reporter interface {
 	Dump() error
@@ -162,7 +166,7 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 	if len(ruleGroupsToCheck) == 0 {
 		// nolint: errcheck
 		level.Error(app.logger).Log("msg", "no rule groups to check. Please check for --check.file flag spelling mistakes")
-		return err
+		return ErrNoRuleGroups
 	}
 
 	var eg errgroup.Group
@@ -286,7 +290,7 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 	if len(ruleGroupsToCheck) == 0 {
 		// nolint: errcheck
 		level.Error(app.logger).Log("msg", "no rule groups to check. Please check whether the Prometheus instance contains any rules.")
-		return err
+		return ErrNoRuleGroups
 	}
 
 	var eg errgroup.Group
