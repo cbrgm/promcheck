@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	promql "github.com/prometheus/prometheus/promql/parser"
 )
 
@@ -205,4 +206,36 @@ func Test_isIgnoredSelector(t *testing.T) {
 			}
 		})
 	}
+}
+
+// fakeProber is a test helper implementing Prober interface
+type fakeProber struct {
+	// values maps a selector string to the value ProbeSelector returns
+	values map[string]float64
+	// err, if set, is returned for every probe
+	err error
+	// calls records every selector passed to ProbeSelector, in order
+	calls []string
+}
+
+func (f *fakeProber) ProbeSelector(selector string) (float64, error) {
+	f.calls = append(f.calls, selector)
+	if f.err != nil {
+		return 0, f.err
+	}
+	return f.values[selector], nil
+}
+
+func TestProbeSelectorResults_ContinuesAfterIgnoredMatcher(t *testing.T) {
+	fp := &fakeProber{values: map[string]float64{
+		`up{job="x"}`: 1, // has a result
+	}}
+	prc := &PrometheusRulesChecker{probe: fp}
+
+	// ALERTS{...} is ignored; up{job="x"} must still be probed.
+	success, failed, err := prc.probeSelectorResults(`ALERTS{alertname="Foo"} or up{job="x"}`)
+	require.NoError(t, err)
+	require.Contains(t, fp.calls, `up{job="x"}`, "selector after the ignored ALERTS selector must still be probed")
+	require.Equal(t, []string{`up{job="x"}`}, success)
+	require.Empty(t, failed)
 }
