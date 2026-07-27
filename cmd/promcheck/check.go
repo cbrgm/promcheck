@@ -1,9 +1,11 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,7 +15,9 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/api"
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/rulefmt"
+	promql "github.com/prometheus/prometheus/promql/parser"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/cbrgm/promcheck/promcheck"
@@ -51,6 +55,7 @@ type promcheckApp struct {
 	logger       log.Logger
 	metrics      metrics.Metrics
 	roundTripper http.RoundTripper
+	parser       promql.Parser
 }
 
 // nolint: errcheck
@@ -124,6 +129,7 @@ func newPromcheck(config *config, logger log.Logger) (*promcheckApp, error) {
 		logger:       logger,
 		metrics:      promMetrics,
 		roundTripper: roundTripper,
+		parser:       promql.NewParser(promql.Options{}),
 	}, nil
 }
 
@@ -154,7 +160,7 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 
 	ruleGroupsToCheck := []promcheck.RuleGroup{}
 	for _, file := range matches {
-		ruleGroups, err := processFile(file)
+		ruleGroups, err := processFile(app.parser, slog.Default(), file)
 		if err != nil {
 			// nolint: errcheck
 			level.Error(app.logger).Log("msg", "failed to parse rule group files", "err", err)
@@ -229,13 +235,13 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 	return app.report.Dump()
 }
 
-func processFile(file string) ([]promcheck.RuleGroup, error) {
-	ruleGroups, errs := rulefmt.ParseFile(file)
+func processFile(p promql.Parser, logger *slog.Logger, file string) ([]promcheck.RuleGroup, error) {
+	ruleGroups, errs := rulefmt.ParseFile(file, false, model.UTF8Validation, p, logger)
 	if len(errs) > 0 {
-		return []promcheck.RuleGroup{}, fmt.Errorf("%s", errs)
+		return nil, fmt.Errorf("%s: %w", file, errors.Join(errs...))
 	}
 
-	converted := []promcheck.RuleGroup{}
+	converted := make([]promcheck.RuleGroup, 0, len(ruleGroups.Groups))
 	for _, group := range ruleGroups.Groups {
 		converted = append(converted, rulefmtToPromcheck(file, group))
 	}
@@ -243,25 +249,12 @@ func processFile(file string) ([]promcheck.RuleGroup, error) {
 }
 
 func rulefmtToPromcheck(fileName string, group rulefmt.RuleGroup) promcheck.RuleGroup {
-	convertedRuleGroup := promcheck.RuleGroup{
-		Name:  group.Name,
-		File:  fileName,
-		Rules: []promcheck.Rule{},
-	}
+	out := promcheck.RuleGroup{Name: group.Name, File: fileName, Rules: make([]promcheck.Rule, 0, len(group.Rules))}
 	for _, rule := range group.Rules {
-		var name string
-		if rule.Record.Value == "" {
-			name = rule.Alert.Value
-		}
-		if rule.Alert.Value == "" {
-			name = rule.Record.Value
-		}
-		convertedRuleGroup.Rules = append(convertedRuleGroup.Rules, promcheck.Rule{
-			Name:       name,
-			Expression: rule.Expr.Value,
-		})
+		name := cmp.Or(rule.Record, rule.Alert)
+		out.Rules = append(out.Rules, promcheck.Rule{Name: name, Expression: rule.Expr})
 	}
-	return convertedRuleGroup
+	return out
 }
 
 func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
