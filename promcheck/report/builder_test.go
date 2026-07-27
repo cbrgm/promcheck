@@ -2,6 +2,8 @@ package report
 
 import (
 	"bytes"
+	"io"
+	"math"
 	"strings"
 	"testing"
 
@@ -65,7 +67,7 @@ func TestBuilder_DumpTree(t *testing.T) {
 .
 
 Groups total: 0, Rules total: 0
-Selectors total: 0, Results found: 0, No Results found 0 (No Results/Total: NaN%)
+Selectors total: 0, Results found: 0, No Results found 0 (No Results/Total: 0.00%)
 `
 	require.NoError(t, b.DumpTree())
 	require.Equal(t, strings.TrimSpace(expected), strings.TrimSpace(buf.String()))
@@ -103,4 +105,13 @@ Selectors total: 4, Results found: 3, No Results found 1 (No Results/Total: 25.0
 
 	require.NoError(t, b.DumpTree())
 	require.Equal(t, strings.TrimSpace(expected), strings.TrimSpace(buf.String()))
+}
+
+func TestFinalize_ZeroSelectorsNoNaN(t *testing.T) {
+	b := NewBuilder(WithWriter(io.Discard))
+	// A rule with no selectors: TotalRules > 0, but total selectors == 0.
+	b.AddSection("f", "g", "r", "vector(1)", nil, nil)
+	b.finalize()
+	require.False(t, math.IsNaN(float64(b.Report.RatioFailedTotal)))
+	require.Equal(t, float32(0), b.Report.RatioFailedTotal)
 }
