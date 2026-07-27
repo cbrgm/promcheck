@@ -147,6 +147,10 @@ func (b *Builder) HasContent() bool {
 // finalize is called by format functions and calculates additional report data.
 func (b *Builder) finalize() {
 	totalSelectors := b.Report.TotalSelectorsFailed + b.Report.TotalSelectorsSuccess
+	if totalSelectors == 0 {
+		b.Report.RatioFailedTotal = 0
+		return
+	}
 	b.Report.RatioFailedTotal = (float32(b.Report.TotalSelectorsFailed) / float32(totalSelectors)) * 100
 }
 
