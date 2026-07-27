@@ -6,11 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/errgroup"
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 
 	"github.com/prometheus/prometheus/model/labels"
 	promql "github.com/prometheus/prometheus/promql/parser"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // PrometheusRulesCheckerConfig represents PrometheusRulesChecker configuration.
