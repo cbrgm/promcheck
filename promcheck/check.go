@@ -36,6 +36,9 @@ type PrometheusRulesChecker struct {
 	// probe implements Prober
 	probe Prober
 
+	// parser is the shared PromQL parser used for expression and selector parsing
+	parser promql.Parser
+
 	// options
 	ignoredSelectorsRegexp []string
 	ignoredGroupsRegexp    []string
@@ -91,6 +94,7 @@ func NewPrometheusRulesChecker(config PrometheusRulesCheckerConfig, client prome
 			config.PrometheusURL,
 			client,
 		),
+		parser:                 promql.NewParser(promql.Options{}),
 		ignoredSelectorsRegexp: config.IgnoredSelectorsRegexp,
 		ignoredGroupsRegexp:    config.IgnoredGroupsRegexp,
 	}
@@ -178,9 +182,9 @@ func (prc *PrometheusRulesChecker) probeSelectorResults(promqlExpression string)
 	selectorsWithoutResult := []string{}
 	selectorsWithResult := []string{}
 
-	selectors, err := getVectorSelectorsFromExpression(promqlExpression)
+	selectors, err := getVectorSelectors(prc.parser, promqlExpression)
 	if err != nil {
-		return selectorsWithResult, selectorsWithoutResult, fmt.Errorf("getVectorSelectorsFromExpression failed: %s", err)
+		return selectorsWithResult, selectorsWithoutResult, fmt.Errorf("getVectorSelectors failed: %w", err)
 	}
 
 	if len(selectors) == 0 {
@@ -193,7 +197,7 @@ func (prc *PrometheusRulesChecker) probeSelectorResults(promqlExpression string)
 			continue
 		}
 
-		matchers, err := promql.ParseMetricSelector(selector)
+		matchers, err := prc.parser.ParseMetricSelector(selector)
 		if err != nil {
 			return selectorsWithResult, selectorsWithoutResult, err
 		}
@@ -234,17 +238,16 @@ func (v *visit) Visit(node promql.Node, _ []promql.Node) (promql.Visitor, error)
 	return v, nil
 }
 
-// getVectorSelectorsFromExpression returns a list of vectorSelectors parsed from the given query.
-func getVectorSelectorsFromExpression(promqlExpression string) ([]string, error) {
-	expr, err := promql.ParseExpr(promqlExpression)
+// getVectorSelectors returns a list of vectorSelectors parsed from the given query.
+func getVectorSelectors(p promql.Parser, promqlExpression string) ([]string, error) {
+	expr, err := p.ParseExpr(promqlExpression)
 	if err != nil {
-		return nil, fmt.Errorf("promql parse error: %s", err)
+		return nil, fmt.Errorf("promql parse error: %w", err)
 	}
 	v := &visit{
 		vectorSelectors: make([]string, 0),
 	}
-	var path []promql.Node
-	_ = promql.Walk(v, expr, path)
+	_ = promql.Walk(v, expr, nil)
 	return v.vectorSelectors, nil
 }
 
