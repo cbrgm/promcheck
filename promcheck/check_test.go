@@ -5,11 +5,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	promql "github.com/prometheus/prometheus/promql/parser"
+	"github.com/stretchr/testify/require"
 )
 
-func Test_getVectorSelectorsFromExpression(t *testing.T) {
+func Test_getVectorSelectors(t *testing.T) {
 	type args struct {
 		promqlExpression string
 	}
@@ -51,28 +51,30 @@ func Test_getVectorSelectorsFromExpression(t *testing.T) {
 			wantErr: false,
 		},
 	}
+	p := promql.NewParser(promql.Options{})
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getVectorSelectorsFromExpression(tt.args.promqlExpression)
+			got, err := getVectorSelectors(p, tt.args.promqlExpression)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getVectorSelectorsFromExpression() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("getVectorSelectors() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getVectorSelectorsFromExpression() got = %v, want %v", got, tt.want)
+				t.Errorf("getVectorSelectors() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
 func Test_ignoreMatchers(t *testing.T) {
+	p := promql.NewParser(promql.Options{})
 	toTest := map[string]bool{
 		"ALERTS{kubernetes=\"foo\"}":           true,
 		"ALERTS_FOR_STATE{kubernetes=\"foo\"}": true,
 		"up{kubernetes=\"foo\"}":               false,
 	}
 	for expression, want := range toTest {
-		matchers, err := promql.ParseMetricSelector(expression)
+		matchers, err := p.ParseMetricSelector(expression)
 		if err != nil {
 			panic(err)
 		}
@@ -231,7 +233,7 @@ func TestProbeSelectorResults_ContinuesAfterIgnoredMatcher(t *testing.T) {
 	fp := &fakeProber{values: map[string]float64{
 		`up{job="x"}`: 1, // has a result
 	}}
-	prc := &PrometheusRulesChecker{probe: fp}
+	prc := &PrometheusRulesChecker{probe: fp, parser: promql.NewParser(promql.Options{})}
 
 	// ALERTS{...} is ignored; up{job="x"} must still be probed.
 	success, failed, err := prc.probeSelectorResults(`ALERTS{alertname="Foo"} or up{job="x"}`)
@@ -243,7 +245,7 @@ func TestProbeSelectorResults_ContinuesAfterIgnoredMatcher(t *testing.T) {
 
 func TestCheckRuleGroup_PropagatesProbeError(t *testing.T) {
 	fp := &fakeProber{err: errors.New("boom")}
-	prc := &PrometheusRulesChecker{probe: fp}
+	prc := &PrometheusRulesChecker{probe: fp, parser: promql.NewParser(promql.Options{})}
 	group := RuleGroup{
 		Name:  "g",
 		Rules: []Rule{{Name: "r", Expression: `up{job="x"}`}},

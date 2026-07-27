@@ -1,0 +1,7 @@
+groups:
+  - name: example
+    rules:
+      - alert: HighLatency
+        expr: up{job="x"} > 0
+      - record: job:up:sum
+        expr: sum(up{job="x"})
