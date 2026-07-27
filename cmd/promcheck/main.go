@@ -43,7 +43,7 @@ type config struct {
 	CheckExpressions            []string `name:"check.query" help:"Inline PromQL expression to check"`
 
 	// output parameters
-	OutputFormat  string `name:"output.format" enum:"graph,json,yaml,csv" default:"graph" help:"The output format to use"`
+	OutputFormat  string `name:"output.format" enum:"graph,json,yaml" default:"graph" help:"The output format to use"`
 	OutputNoColor bool   `name:"output.no-color" default:"false" help:"Toggle colored output"`
 
 	// exporter parameters
