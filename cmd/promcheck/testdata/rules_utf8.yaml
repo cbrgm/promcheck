@@ -1,0 +1,5 @@
+groups:
+  - name: otel
+    rules:
+      - alert: SlowRoute
+        expr: sum({"http.server.duration", "http.route"="/x"}) > 1
