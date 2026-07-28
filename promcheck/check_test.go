@@ -253,3 +253,14 @@ func TestCheckRuleGroup_PropagatesProbeError(t *testing.T) {
 	_, err := prc.CheckRuleGroup(group)
 	require.Error(t, err)
 }
+
+func TestGetVectorSelectors_UTF8Names(t *testing.T) {
+	p := promql.NewParser(promql.Options{})
+	// dotted metric and label names require the quoted brace form
+	sel, err := getVectorSelectors(p, `sum({"http.server.duration", "http.route"="/x"})`)
+	require.NoError(t, err)
+	require.Len(t, sel, 1)
+	// the reconstructed selector must be re-parseable
+	_, err = p.ParseMetricSelector(sel[0])
+	require.NoError(t, err, "reconstructed UTF-8 selector must round-trip: %q", sel[0])
+}
