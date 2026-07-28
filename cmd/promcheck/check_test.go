@@ -32,3 +32,11 @@ func TestProcessFile_ParsesRecordsAndAlerts(t *testing.T) {
 	names := []string{groups[0].Rules[0].Name, groups[0].Rules[1].Name}
 	require.ElementsMatch(t, []string{"HighLatency", "job:up:sum"}, names)
 }
+
+func TestProcessFile_UTF8Names(t *testing.T) {
+	p := promql.NewParser(promql.Options{})
+	groups, err := processFile(p, slog.New(slog.NewTextHandler(io.Discard, nil)), "testdata/rules_utf8.yaml")
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	require.Equal(t, "SlowRoute", groups[0].Rules[0].Name)
+}
