@@ -37,7 +37,7 @@ type config struct {
 	// check parameters
 	CheckIgnoredSelectorsRegexp []string `name:"check.ignore-selector" help:"Regexp of selectors to ignore"`
 	CheckIgnoredGroupsRegexp    []string `name:"check.ignore-group" help:"Regexp of rule groups to ignore"`
-	CheckDelay                  float64  `name:"check.delay" default:"0.1" help:"Delay in seconds between probe requests"`
+	CheckConcurrency            int      `name:"check.concurrency" default:"8" help:"Maximum number of selectors probed in parallel"`
 	CheckFiles                  string   `name:"check.file" help:"The rule files to check."`
 	CheckExpressions            []string `name:"check.query" help:"Inline PromQL expression to check"`
 
@@ -84,8 +84,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if cfg.CheckDelay < 0 {
-		logger.Error("configuration error", "err", "--check.delay must be > 0")
+	if cfg.CheckConcurrency < 1 {
+		logger.Error("configuration error", "err", "--check.concurrency must be >= 1")
 		os.Exit(1)
 	}
 
