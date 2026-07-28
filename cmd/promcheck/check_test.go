@@ -5,13 +5,12 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/go-kit/log"
 	promql "github.com/prometheus/prometheus/promql/parser"
 	"github.com/stretchr/testify/require"
 )
 
-func newTestLogger() log.Logger {
-	return log.NewLogfmtLogger(io.Discard)
+func newTestLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func TestCheckRulesFromRuleFiles_EmptyReturnsError(t *testing.T) {

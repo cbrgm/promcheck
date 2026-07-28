@@ -2,13 +2,12 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"runtime"
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 )
 
 const (
@@ -77,34 +76,16 @@ func main() {
 		),
 	)
 
-	levelFilter := map[string]level.Option{
-		levelError: level.AllowError(),
-		levelWarn:  level.AllowWarn(),
-		levelInfo:  level.AllowInfo(),
-		levelDebug: level.AllowDebug(),
-	}
-
-	logger := log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
-	if cfg.LogJSON {
-		logger = log.NewJSONLogger(log.NewSyncWriter(os.Stderr))
-	}
-
-	logger = level.NewFilter(logger, levelFilter[cfg.LogLevel])
-	logger = log.With(logger,
-		"ts", log.DefaultTimestampUTC,
-		"caller", log.DefaultCaller,
-	)
+	logger := newLogger(cfg.LogJSON, cfg.LogLevel)
 
 	// validation
 	if cfg.ExporterInterval < 0 {
-		// nolint: errcheck
-		level.Error(logger).Log("msg", "configuration error", "err", "--exporter.interval must be > 0")
+		logger.Error("configuration error", "err", "--exporter.interval must be > 0")
 		os.Exit(1)
 	}
 
 	if cfg.CheckDelay < 0 {
-		// nolint: errcheck
-		level.Error(logger).Log("msg", "configuration error", "err", "--check.delay must be > 0")
+		logger.Error("configuration error", "err", "--check.delay must be > 0")
 		os.Exit(1)
 	}
 
@@ -118,4 +99,24 @@ func main() {
 		os.Exit(1)
 	}
 	os.Exit(0)
+}
+
+func newLogger(jsonOut bool, lvl string) *slog.Logger {
+	var level slog.Level
+	switch lvl {
+	case levelDebug:
+		level = slog.LevelDebug
+	case levelWarn:
+		level = slog.LevelWarn
+	case levelError:
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+	}
+	opts := &slog.HandlerOptions{Level: level}
+	var h slog.Handler = slog.NewTextHandler(os.Stderr, opts)
+	if jsonOut {
+		h = slog.NewJSONHandler(os.Stderr, opts)
+	}
+	return slog.New(h)
 }
