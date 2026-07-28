@@ -17,14 +17,12 @@ type Prober interface {
 
 type prometheusProbe struct {
 	api           prometheusv1.API
-	delay         time.Duration
 	prometheusURL string
 }
 
-func newPrometheusProbe(delay time.Duration, prometheusURL string, client prometheusv1.API) Prober {
+func newPrometheusProbe(prometheusURL string, client prometheusv1.API) Prober {
 	return &prometheusProbe{
 		api:           client,
-		delay:         delay,
 		prometheusURL: prometheusURL,
 	}
 }
@@ -52,10 +50,5 @@ func (p *prometheusProbe) probe(selector string) (float64, error) {
 
 // ProbeSelector implements Prober.
 func (p *prometheusProbe) ProbeSelector(selector string) (float64, error) {
-	v, err := p.probe(selector)
-	if err != nil {
-		return 0, err
-	}
-	time.Sleep(p.delay)
-	return v, nil
+	return p.probe(selector)
 }

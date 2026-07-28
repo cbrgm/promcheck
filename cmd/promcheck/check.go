@@ -47,6 +47,7 @@ type promcheckApp struct {
 	optFilesRegexp                  string
 	optInlineExpressions            []string
 	optStrictMode                   bool
+	optConcurrency                  int
 
 	check        Checker
 	report       Reporter
@@ -83,7 +84,6 @@ func newPromcheck(config *config, logger *slog.Logger) (*promcheckApp, error) {
 	promAPI := prometheusv1.NewAPI(client)
 	checker := promcheck.NewPrometheusRulesChecker(
 		promcheck.PrometheusRulesCheckerConfig{
-			ProbeDelay:             time.Duration(config.CheckDelay) * time.Second,
 			PrometheusURL:          config.PrometheusURL,
 			IgnoredSelectorsRegexp: config.CheckIgnoredSelectorsRegexp,
 			IgnoredGroupsRegexp:    config.CheckIgnoredGroupsRegexp,
@@ -119,6 +119,7 @@ func newPromcheck(config *config, logger *slog.Logger) (*promcheckApp, error) {
 		optFilesRegexp:                  config.CheckFiles,
 		optInlineExpressions:            config.CheckExpressions,
 		optStrictMode:                   config.StrictMode,
+		optConcurrency:                  config.CheckConcurrency,
 
 		// internal
 		check:        checker,

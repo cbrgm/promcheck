@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"sync"
-	"time"
 
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 
@@ -16,9 +15,6 @@ import (
 
 // PrometheusRulesCheckerConfig represents PrometheusRulesChecker configuration.
 type PrometheusRulesCheckerConfig struct {
-	// ProbeDelay represents the delay between selector probes
-	ProbeDelay time.Duration
-
 	// PrometheusURL represents the Prometheus instance url
 	PrometheusURL string
 
@@ -90,7 +86,6 @@ type CheckResult struct {
 func NewPrometheusRulesChecker(config PrometheusRulesCheckerConfig, client prometheusv1.API) *PrometheusRulesChecker {
 	return &PrometheusRulesChecker{
 		probe: newPrometheusProbe(
-			config.ProbeDelay,
 			config.PrometheusURL,
 			client,
 		),
