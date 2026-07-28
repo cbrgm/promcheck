@@ -33,7 +33,7 @@ type Reporter interface {
 }
 
 type Checker interface {
-	CheckRuleGroup(group promcheck.RuleGroup) ([]promcheck.CheckResult, error)
+	CheckRuleGroup(ctx context.Context, group promcheck.RuleGroup) ([]promcheck.CheckResult, error)
 }
 
 type promcheckApp struct {
@@ -82,7 +82,7 @@ func newPromcheck(config *config, logger *slog.Logger) (*promcheckApp, error) {
 	}
 
 	promAPI := prometheusv1.NewAPI(client)
-	checker := promcheck.NewPrometheusRulesChecker(
+	checker, err := promcheck.NewPrometheusRulesChecker(
 		promcheck.PrometheusRulesCheckerConfig{
 			PrometheusURL:          config.PrometheusURL,
 			IgnoredSelectorsRegexp: config.CheckIgnoredSelectorsRegexp,
@@ -90,6 +90,10 @@ func newPromcheck(config *config, logger *slog.Logger) (*promcheckApp, error) {
 		},
 		promAPI,
 	)
+	if err != nil {
+		logger.Error("failed to create rules checker", "err", err)
+		return nil, err
+	}
 
 	promMetrics := metrics.NewPrometheus(metrics.Options{
 		Prefix:               config.ExporterMetricsPrefix,
@@ -177,7 +181,7 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 	for _, group := range ruleGroupsToCheck {
 		group := group // https://golang.org/doc/faq#closures_and_goroutines
 		eg.Go(func() error {
-			checked, err := app.check.CheckRuleGroup(group)
+			checked, err := app.check.CheckRuleGroup(context.TODO(), group)
 			if err != nil {
 				app.logger.Error("failed to check rule groups", "file", group.File, "err", err)
 				return err
@@ -282,7 +286,7 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 	for _, group := range ruleGroupsToCheck {
 		group := group // https://golang.org/doc/faq#closures_and_goroutines
 		eg.Go(func() error {
-			checked, err := app.check.CheckRuleGroup(group)
+			checked, err := app.check.CheckRuleGroup(context.TODO(), group)
 			if err != nil {
 				app.logger.Error("failed to check rule groups", "file", group.File, "err", err)
 				return err
@@ -368,7 +372,7 @@ func (app *promcheckApp) checkRulesFromInlineQueries() error {
 	}
 
 	checkResults := []promcheck.CheckResult{}
-	checked, err := app.check.CheckRuleGroup(group)
+	checked, err := app.check.CheckRuleGroup(context.TODO(), group)
 	if err != nil {
 		app.logger.Error("failed to check rule groups", "file", group.File, "err", err)
 		return err

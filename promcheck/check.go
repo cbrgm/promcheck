@@ -1,8 +1,10 @@
 package promcheck
 
 import (
+	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"sync"
 
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -36,8 +38,8 @@ type PrometheusRulesChecker struct {
 	parser promql.Parser
 
 	// options
-	ignoredSelectorsRegexp []string
-	ignoredGroupsRegexp    []string
+	ignoredSelectorsRegexp []*regexp.Regexp
+	ignoredGroupsRegexp    []*regexp.Regexp
 }
 
 // RuleGroup models a rule group that contains a set of recording and alerting rules.
@@ -83,27 +85,51 @@ type CheckResult struct {
 }
 
 // NewPrometheusRulesChecker returns PrometheusRulesChecker.
-func NewPrometheusRulesChecker(config PrometheusRulesCheckerConfig, client prometheusv1.API) *PrometheusRulesChecker {
+func NewPrometheusRulesChecker(config PrometheusRulesCheckerConfig, client prometheusv1.API) (*PrometheusRulesChecker, error) {
+	ignoredSelectors, err := compilePatterns(config.IgnoredSelectorsRegexp)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ignore-selector pattern: %w", err)
+	}
+	ignoredGroups, err := compilePatterns(config.IgnoredGroupsRegexp)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ignore-group pattern: %w", err)
+	}
 	return &PrometheusRulesChecker{
 		probe: newPrometheusProbe(
 			config.PrometheusURL,
 			client,
 		),
 		parser:                 promql.NewParser(promql.Options{}),
-		ignoredSelectorsRegexp: config.IgnoredSelectorsRegexp,
-		ignoredGroupsRegexp:    config.IgnoredGroupsRegexp,
+		ignoredSelectorsRegexp: ignoredSelectors,
+		ignoredGroupsRegexp:    ignoredGroups,
+	}, nil
+}
+
+// compilePatterns compiles the given regexp patterns once at construction.
+func compilePatterns(patterns []string) ([]*regexp.Regexp, error) {
+	if len(patterns) == 0 {
+		return nil, nil
 	}
+	compiled := make([]*regexp.Regexp, 0, len(patterns))
+	for _, p := range patterns {
+		re, err := regexp.Compile(p)
+		if err != nil {
+			return nil, fmt.Errorf("%q: %w", p, err)
+		}
+		compiled = append(compiled, re)
+	}
+	return compiled, nil
 }
 
 // CheckRuleGroups checks Prometheus rule groups.
 // CheckRuleGroups returns a list of CheckResult.
-func (prc *PrometheusRulesChecker) CheckRuleGroups(groups []RuleGroup) ([]CheckResult, error) {
+func (prc *PrometheusRulesChecker) CheckRuleGroups(ctx context.Context, groups []RuleGroup) ([]CheckResult, error) {
 	results := []CheckResult{}
 	for _, g := range groups {
 		if isIgnoredGroup(prc.ignoredGroupsRegexp, g.Name) {
 			continue
 		}
-		res, err := prc.CheckRuleGroup(g)
+		res, err := prc.CheckRuleGroup(ctx, g)
 		if err != nil {
 			return results, err
 		}
@@ -114,7 +140,7 @@ func (prc *PrometheusRulesChecker) CheckRuleGroups(groups []RuleGroup) ([]CheckR
 
 // CheckRuleGroup checks a single rule group.
 // CheckRuleGroup returns a list of CheckResult.
-func (prc *PrometheusRulesChecker) CheckRuleGroup(group RuleGroup) ([]CheckResult, error) {
+func (prc *PrometheusRulesChecker) CheckRuleGroup(ctx context.Context, group RuleGroup) ([]CheckResult, error) {
 	var (
 		mu      sync.Mutex
 		results = make([]CheckResult, 0, len(group.Rules))
@@ -122,7 +148,7 @@ func (prc *PrometheusRulesChecker) CheckRuleGroup(group RuleGroup) ([]CheckResul
 	)
 	for _, rule := range group.Rules {
 		eg.Go(func() error {
-			success, failed, err := prc.probeSelectorResults(rule.Expression)
+			success, failed, err := prc.probeSelectorResults(ctx, rule.Expression)
 			if err != nil {
 				return fmt.Errorf("rule %q: %w", rule.Name, err)
 			}
@@ -145,35 +171,23 @@ func (prc *PrometheusRulesChecker) CheckRuleGroup(group RuleGroup) ([]CheckResul
 	return results, nil
 }
 
-func isIgnoredGroup(ignoredRegexp []string, group string) bool {
-	return isIgnored(ignoredRegexp, group)
+func isIgnoredGroup(patterns []*regexp.Regexp, group string) bool {
+	return isIgnored(patterns, group)
 }
 
-func isIgnoredSelector(ignoredRegexp []string, selector string) bool {
-	return isIgnored(ignoredRegexp, selector)
+func isIgnoredSelector(patterns []*regexp.Regexp, selector string) bool {
+	return isIgnored(patterns, selector)
 }
 
-// isIgnored checks whether the given selector matches ignoredRegexp.
-// isIgnored returns true if selector matches, false otherwise.
-func isIgnored(ignoredRegexp []string, selector string) bool {
-	if ignoredRegexp == nil {
-		return false
-	}
-	for _, re := range ignoredRegexp {
-		isMatching, err := regexp.MatchString(re, selector)
-		if err != nil {
-			return false
-		}
-		if isMatching {
-			return true
-		}
-	}
-	return false
+// isIgnored checks whether s matches any of the pre-compiled patterns.
+// isIgnored returns true if s matches, false otherwise.
+func isIgnored(patterns []*regexp.Regexp, s string) bool {
+	return slices.ContainsFunc(patterns, func(re *regexp.Regexp) bool { return re.MatchString(s) })
 }
 
 // probeSelectorResults probes the given PromQL expression string for selectors without a result value.
 // probeSelectorResults returns a list of successful selectors and failed selectors.
-func (prc *PrometheusRulesChecker) probeSelectorResults(promqlExpression string) ([]string, []string, error) {
+func (prc *PrometheusRulesChecker) probeSelectorResults(ctx context.Context, promqlExpression string) ([]string, []string, error) {
 	selectorsWithoutResult := []string{}
 	selectorsWithResult := []string{}
 
@@ -187,6 +201,10 @@ func (prc *PrometheusRulesChecker) probeSelectorResults(promqlExpression string)
 	}
 
 	for _, selector := range selectors {
+		if err := ctx.Err(); err != nil {
+			return selectorsWithResult, selectorsWithoutResult, err
+		}
+
 		// we can move on if this selector is ignored
 		if isIgnoredSelector(prc.ignoredSelectorsRegexp, selector) {
 			continue
@@ -199,7 +217,7 @@ func (prc *PrometheusRulesChecker) probeSelectorResults(promqlExpression string)
 		if ignoreMatchers(matchers) {
 			continue
 		}
-		val, err := prc.probe.ProbeSelector(selector)
+		val, err := prc.probe.ProbeSelector(ctx, selector)
 		if err != nil {
 			return selectorsWithResult, selectorsWithoutResult, err
 		}

@@ -1,13 +1,24 @@
 package promcheck
 
 import (
+	"context"
 	"errors"
 	"reflect"
+	"regexp"
 	"testing"
 
 	promql "github.com/prometheus/prometheus/promql/parser"
 	"github.com/stretchr/testify/require"
 )
+
+// mustCompileAll compiles each pattern for use in the ignore tests.
+func mustCompileAll(patterns []string) []*regexp.Regexp {
+	out := make([]*regexp.Regexp, 0, len(patterns))
+	for _, p := range patterns {
+		out = append(out, regexp.MustCompile(p))
+	}
+	return out
+}
 
 func Test_getVectorSelectors(t *testing.T) {
 	type args struct {
@@ -113,7 +124,7 @@ func Test_isIgnored(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isIgnored(tt.args.ignoredRegexp, tt.args.selector); got != tt.want {
+			if got := isIgnored(mustCompileAll(tt.args.ignoredRegexp), tt.args.selector); got != tt.want {
 				t.Errorf("isIgnored() = %v, want %v", got, tt.want)
 			}
 		})
@@ -153,7 +164,7 @@ func Test_isIgnoredGroup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isIgnoredGroup(tt.args.ignoredRegexp, tt.args.group); got != tt.want {
+			if got := isIgnoredGroup(mustCompileAll(tt.args.ignoredRegexp), tt.args.group); got != tt.want {
 				t.Errorf("isIgnoredGroup() = %v, want %v", got, tt.want)
 			}
 		})
@@ -204,7 +215,7 @@ func Test_isIgnoredSelector(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isIgnoredSelector(tt.args.ignoredRegexp, tt.args.selector); got != tt.want {
+			if got := isIgnoredSelector(mustCompileAll(tt.args.ignoredRegexp), tt.args.selector); got != tt.want {
 				t.Errorf("isIgnoredSelector() = %v, want %v", got, tt.want)
 			}
 		})
@@ -221,7 +232,10 @@ type fakeProber struct {
 	calls []string
 }
 
-func (f *fakeProber) ProbeSelector(selector string) (float64, error) {
+func (f *fakeProber) ProbeSelector(ctx context.Context, selector string) (float64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	f.calls = append(f.calls, selector)
 	if f.err != nil {
 		return 0, f.err
@@ -236,7 +250,7 @@ func TestProbeSelectorResults_ContinuesAfterIgnoredMatcher(t *testing.T) {
 	prc := &PrometheusRulesChecker{probe: fp, parser: promql.NewParser(promql.Options{})}
 
 	// ALERTS{...} is ignored; up{job="x"} must still be probed.
-	success, failed, err := prc.probeSelectorResults(`ALERTS{alertname="Foo"} or up{job="x"}`)
+	success, failed, err := prc.probeSelectorResults(t.Context(), `ALERTS{alertname="Foo"} or up{job="x"}`)
 	require.NoError(t, err)
 	require.Contains(t, fp.calls, `up{job="x"}`, "selector after the ignored ALERTS selector must still be probed")
 	require.Equal(t, []string{`up{job="x"}`}, success)
@@ -250,8 +264,17 @@ func TestCheckRuleGroup_PropagatesProbeError(t *testing.T) {
 		Name:  "g",
 		Rules: []Rule{{Name: "r", Expression: `up{job="x"}`}},
 	}
-	_, err := prc.CheckRuleGroup(group)
+	_, err := prc.CheckRuleGroup(t.Context(), group)
 	require.Error(t, err)
+}
+
+func TestProbeSelector_HonorsContextCancellation(t *testing.T) {
+	fp := &fakeProber{} // fakeProber updated to accept ctx (see below)
+	prc := &PrometheusRulesChecker{probe: fp, parser: promql.NewParser(promql.Options{})}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, _, err := prc.probeSelectorResults(ctx, `up{job="x"}`)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestGetVectorSelectors_UTF8Names(t *testing.T) {

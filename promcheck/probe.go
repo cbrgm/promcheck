@@ -12,7 +12,7 @@ import (
 // Prober represents probe.
 type Prober interface {
 	// ProbeSelector probes the given PromQL selector against a remote instance.
-	ProbeSelector(selector string) (float64, error)
+	ProbeSelector(ctx context.Context, selector string) (float64, error)
 }
 
 type prometheusProbe struct {
@@ -27,9 +27,9 @@ func newPrometheusProbe(prometheusURL string, client prometheusv1.API) Prober {
 	}
 }
 
-func (p *prometheusProbe) probe(selector string) (float64, error) {
+func (p *prometheusProbe) probe(ctx context.Context, selector string) (float64, error) {
 	query := fmt.Sprintf("count(%s)", selector)
-	value, _, err := p.api.Query(context.TODO(), query, time.Now())
+	value, _, err := p.api.Query(ctx, query, time.Now())
 	if err != nil {
 		return 0, fmt.Errorf("failed to query metrics: %w", err)
 	}
@@ -49,6 +49,6 @@ func (p *prometheusProbe) probe(selector string) (float64, error) {
 }
 
 // ProbeSelector implements Prober.
-func (p *prometheusProbe) ProbeSelector(selector string) (float64, error) {
-	return p.probe(selector)
+func (p *prometheusProbe) ProbeSelector(ctx context.Context, selector string) (float64, error) {
+	return p.probe(ctx, selector)
 }
