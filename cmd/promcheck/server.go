@@ -9,8 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/oklog/run"
 
 	"github.com/cbrgm/promcheck/promcheck/metrics"
@@ -21,7 +19,7 @@ func (app *promcheckApp) runPromcheckExporter() error {
 	var gr run.Group
 	// http server
 	{
-		httpLogger := log.With(app.logger, "component", "exporter")
+		httpLogger := app.logger.With("component", "exporter")
 		m := http.NewServeMux()
 		handleHealth := func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -50,11 +48,7 @@ func (app *promcheckApp) runPromcheckExporter() error {
 			</html>`))
 		})
 		gr.Add(func() error {
-			// nolint: errcheck
-			level.Info(httpLogger).Log(
-				"msg", "running http server",
-				"addr", s.Addr,
-			)
+			httpLogger.Info("running http server", "addr", s.Addr)
 
 			return s.ListenAndServe()
 		}, func(_ error) {
@@ -71,21 +65,14 @@ func (app *promcheckApp) runPromcheckExporter() error {
 				case <-ctx.Done():
 					return nil
 				case <-tick.C:
-					// nolint: errcheck
-					level.Info(app.logger).Log(
-						"msg", "executing promcheck routine",
-					)
+					app.logger.Info("executing promcheck routine")
 					if err := app.checkRules(); err != nil {
 						return err
 					}
 				}
 			}
 		}, func(err error) {
-			// nolint: errcheck
-			level.Info(app.logger).Log(
-				"msg", "error while executing promcheck routine",
-				"err", err,
-			)
+			app.logger.Info("error while executing promcheck routine", "err", err)
 		})
 	}
 	{
