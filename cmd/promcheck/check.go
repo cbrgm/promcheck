@@ -47,6 +47,7 @@ type promcheckApp struct {
 	optPrometheusURL                string
 	optFilesRegexp                  string
 	optInlineExpressions            []string
+	optCheckMatch                   []string
 	optStrictMode                   bool
 
 	check        Checker
@@ -123,6 +124,7 @@ func newPromcheck(config *config, logger *slog.Logger) (*promcheckApp, error) {
 		optPrometheusURL:                config.PrometheusURL,
 		optFilesRegexp:                  config.CheckFiles,
 		optInlineExpressions:            config.CheckExpressions,
+		optCheckMatch:                   config.CheckMatch,
 		optStrictMode:                   config.StrictMode,
 
 		// internal
@@ -274,23 +276,15 @@ func rulefmtToPromcheck(fileName string, group rulefmt.RuleGroup) promcheck.Rule
 
 // instanceSource loads rule groups from a live Prometheus instance.
 type instanceSource struct {
-	app *promcheckApp
+	app      *promcheckApp
+	api      prometheusv1.API
+	matchers []string
 }
 
 func (s instanceSource) name() string { return "instance" }
 
 func (s instanceSource) load(ctx context.Context) ([]promcheck.RuleGroup, error) {
-	client, err := api.NewClient(api.Config{
-		Address:      s.app.optPrometheusURL,
-		RoundTripper: s.app.roundTripper,
-	})
-	if err != nil {
-		s.app.logger.Error("failed to create Prometheus client", "err", err)
-		return nil, err
-	}
-	promAPI := prometheusv1.NewAPI(client)
-	// matchers stay nil for now; server-side matcher filtering arrives in Task 4.1.
-	apiResponse, err := promAPI.Rules(ctx, nil)
+	apiResponse, err := s.api.Rules(ctx, s.matchers)
 	if err != nil {
 		s.app.logger.Error("failed to receive rules from prometheus instance", "err", err)
 		return nil, err
@@ -304,7 +298,16 @@ func (s instanceSource) load(ctx context.Context) ([]promcheck.RuleGroup, error)
 }
 
 func (app *promcheckApp) checkRulesFromPrometheusInstance(ctx context.Context) error {
-	return app.runCheck(ctx, instanceSource{app: app})
+	client, err := api.NewClient(api.Config{
+		Address:      app.optPrometheusURL,
+		RoundTripper: app.roundTripper,
+	})
+	if err != nil {
+		app.logger.Error("failed to create Prometheus client", "err", err)
+		return err
+	}
+	promAPI := prometheusv1.NewAPI(client)
+	return app.runCheck(ctx, instanceSource{app: app, api: promAPI, matchers: app.optCheckMatch})
 }
 
 func prometheusv1ToPromcheck(group prometheusv1.RuleGroup) promcheck.RuleGroup {

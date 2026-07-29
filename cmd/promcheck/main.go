@@ -40,6 +40,7 @@ type config struct {
 	CheckConcurrency            int      `name:"check.concurrency" default:"8" help:"Maximum number of selectors probed in parallel"`
 	CheckFiles                  string   `name:"check.file" help:"The rule files to check."`
 	CheckExpressions            []string `name:"check.query" help:"Inline PromQL expression to check"`
+	CheckMatch                  []string `name:"check.match" help:"PromQL label matchers to filter rules server-side, e.g. '{team=\"infra\"}'"`
 
 	// output parameters
 	OutputFormat  string `name:"output.format" enum:"graph,json,yaml" default:"graph" help:"The output format to use"`
