@@ -27,6 +27,10 @@ type PrometheusRulesCheckerConfig struct {
 	// IgnoredGroupsRegexp represents a list of ignored group regexp
 	// This parameter can be used to exclude groups and therefore a set of selectors from probes
 	IgnoredGroupsRegexp []string
+
+	// MaxConcurrency bounds the total number of concurrent selector probes across
+	// all rule groups and rules. A value <= 0 means unbounded.
+	MaxConcurrency int
 }
 
 // PrometheusRulesChecker represents linting PromQL logic.
@@ -40,6 +44,9 @@ type PrometheusRulesChecker struct {
 	// options
 	ignoredSelectorsRegexp []*regexp.Regexp
 	ignoredGroupsRegexp    []*regexp.Regexp
+
+	// sem bounds the total number of concurrent probes. A nil sem means unbounded.
+	sem chan struct{}
 }
 
 // RuleGroup models a rule group that contains a set of recording and alerting rules.
@@ -94,6 +101,10 @@ func NewPrometheusRulesChecker(config PrometheusRulesCheckerConfig, client prome
 	if err != nil {
 		return nil, fmt.Errorf("invalid ignore-group pattern: %w", err)
 	}
+	var sem chan struct{}
+	if config.MaxConcurrency > 0 {
+		sem = make(chan struct{}, config.MaxConcurrency)
+	}
 	return &PrometheusRulesChecker{
 		probe: newPrometheusProbe(
 			config.PrometheusURL,
@@ -102,6 +113,7 @@ func NewPrometheusRulesChecker(config PrometheusRulesCheckerConfig, client prome
 		parser:                 promql.NewParser(promql.Options{}),
 		ignoredSelectorsRegexp: ignoredSelectors,
 		ignoredGroupsRegexp:    ignoredGroups,
+		sem:                    sem,
 	}, nil
 }
 
@@ -217,7 +229,17 @@ func (prc *PrometheusRulesChecker) probeSelectorResults(ctx context.Context, pro
 		if ignoreMatchers(matchers) {
 			continue
 		}
+		if prc.sem != nil {
+			select {
+			case prc.sem <- struct{}{}:
+			case <-ctx.Done():
+				return selectorsWithResult, selectorsWithoutResult, ctx.Err()
+			}
+		}
 		val, err := prc.probe.ProbeSelector(ctx, selector)
+		if prc.sem != nil {
+			<-prc.sem
+		}
 		if err != nil {
 			return selectorsWithResult, selectorsWithoutResult, err
 		}
