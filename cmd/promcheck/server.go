@@ -66,7 +66,7 @@ func (app *promcheckApp) runPromcheckExporter() error {
 					return nil
 				case <-tick.C:
 					app.logger.Info("executing promcheck routine")
-					if err := app.checkRules(); err != nil {
+					if err := app.checkRules(ctx); err != nil {
 						return err
 					}
 				}
