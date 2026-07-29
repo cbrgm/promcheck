@@ -48,7 +48,6 @@ type promcheckApp struct {
 	optFilesRegexp                  string
 	optInlineExpressions            []string
 	optStrictMode                   bool
-	optConcurrency                  int
 
 	check        Checker
 	report       Reporter
@@ -88,6 +87,7 @@ func newPromcheck(config *config, logger *slog.Logger) (*promcheckApp, error) {
 			PrometheusURL:          config.PrometheusURL,
 			IgnoredSelectorsRegexp: config.CheckIgnoredSelectorsRegexp,
 			IgnoredGroupsRegexp:    config.CheckIgnoredGroupsRegexp,
+			MaxConcurrency:         config.CheckConcurrency,
 		},
 		promAPI,
 	)
@@ -124,7 +124,6 @@ func newPromcheck(config *config, logger *slog.Logger) (*promcheckApp, error) {
 		optFilesRegexp:                  config.CheckFiles,
 		optInlineExpressions:            config.CheckExpressions,
 		optStrictMode:                   config.StrictMode,
-		optConcurrency:                  config.CheckConcurrency,
 
 		// internal
 		check:        checker,
@@ -176,12 +175,10 @@ func (app *promcheckApp) runCheck(ctx context.Context, src ruleSource) error {
 		checkResults []promcheck.CheckResult
 		eg           errgroup.Group
 	)
-	if app.optConcurrency > 0 {
-		eg.SetLimit(app.optConcurrency)
-	}
 
+	// The outer fan-out over groups is unbounded; total probe concurrency is
+	// bounded inside the checker (see PrometheusRulesCheckerConfig.MaxConcurrency).
 	for _, group := range groups {
-		group := group // https://golang.org/doc/faq#closures_and_goroutines
 		eg.Go(func() error {
 			checked, err := app.check.CheckRuleGroup(ctx, group)
 			if err != nil {
@@ -191,13 +188,13 @@ func (app *promcheckApp) runCheck(ctx context.Context, src ruleSource) error {
 			mu.Lock()
 			checkResults = append(checkResults, checked...)
 			mu.Unlock()
-			app.report.AddTotalCheckedGroups(1)
 			return nil
 		})
 	}
 	if err := eg.Wait(); err != nil {
 		return err
 	}
+	app.report.AddTotalCheckedGroups(len(groups))
 
 	hasExpressionsWithoutResult := false
 	for _, cr := range checkResults {
