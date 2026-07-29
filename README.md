@@ -57,7 +57,7 @@ referenced selectors out of it and probes them against a remote Prometheus insta
 `promcheck` is available on Linux, OSX and Windows platforms. Binaries for Linux, Windows and Mac are available as
 tarballs in the [release](https://github.com/cbrgm/promcheck/releases) page.
 
-You may also build `promcheck` from source (using Go 1.17+). In order to build `promcheck` from source you must:
+You may also build `promcheck` from source (using Go 1.25+). In order to build `promcheck` from source you must:
 
 * Clone this repository
 * Run `make build`
@@ -67,7 +67,7 @@ You may also build `promcheck` from source (using Go 1.17+). In order to build `
 `promcheck` can be used in three different modes:
 
 * Validate rules passed to `promcheck` as parameters (`--check.query`)
-* Validate rules from existing rule files (`--check.files`)
+* Validate rules from existing rule files (`--check.file`)
 * Validate rules from a running Prometheus instance (and export results in various formats)
 
 `promcheck` can also be executed as a Prometheus exporter to check a set of rules on a regular basis and export results as scrapeable Prometheus metrics via http.
@@ -89,6 +89,16 @@ promcheck --prometheus.url="http://0.0.0.0:9090"
 Argument Reference:
 
 * `--prometheus.url` - The Prometheus instance to probe selectors against
+
+#### Filtering rules server-side
+
+When validating rules from a running Prometheus instance, you can narrow down which rules get fetched by passing one or more PromQL label matchers via `--check.match`. The matchers are sent to Prometheus and applied server-side, so `promcheck` never even sees rules that don't match.
+
+```bash
+promcheck --prometheus.url="http://0.0.0.0:9090" --check.match='{team="infra"}'
+```
+
+* `--check.match` - PromQL label matcher to filter rules server-side (can be passed multiple times)
 
 ### Validate rules from existing rule files
 
@@ -170,9 +180,10 @@ Flags:
       --prometheus.basic-auth-pass=""                      Basic auth password
       --check.ignore-selector=CHECK.IGNORE-SELECTOR,...    Regexp of selectors to ignore
       --check.ignore-group=CHECK.IGNORE-GROUP,...          Regexp of rule groups to ignore
-      --check.delay=0.1                                    Delay in seconds between probe requests
+      --check.concurrency=8                                Maximum number of selectors probed in parallel
       --check.file=STRING                                  The rule files to check.
       --check.query=CHECK.QUERY,...                        Inline PromQL expression to check
+      --check.match=CHECK.MATCH,...                        PromQL label matchers to filter rules server-side, e.g. '{team="infra"}'
       --output.format="graph"                              The output format to use
       --output.no-color                                    Toggle colored output
       --exporter.enabled                                   Run promcheck as a prometheus exporter
@@ -197,7 +208,7 @@ export TERM=xterm-256color
 Keep in mind that `promcheck` may also contain **false positives**, since there may be vector selectors in rules that
 intentionally do not return a result value.
 
-`promcheck` does a single HTTP request per vector selector to be probed against the remote Prometheus instance. With many rules to validate, execution time can take longer and lead to many HTTP requests. The interval between probes can be changed with the `--check.delay` flag, which results in fewer requests but increases the runtime of the tool.
+`promcheck` does a single HTTP request per vector selector to be probed against the remote Prometheus instance. With many rules to validate, this can add up to a lot of HTTP requests. The `--check.concurrency` flag (default `8`) bounds how many of these probes run in parallel: a higher value finishes faster but puts more concurrent load on Prometheus, a lower value is gentler on Prometheus but increases the runtime of the tool.
 
 ### CI/CD Usage
 
@@ -386,8 +397,8 @@ Please refer below for some basic usage examples demonstrating what `promcheck` 
         └── [1/1] KubeControllerManagerDown
             └── [✔] up{job="kube-controller-manager"}
 
-Rules validated total: 4
-Selectors total: 5, Results found: 4, No Results found 1 (Failed/Total: 20.00%)
+Groups total: 3, Rules total: 4
+Selectors total: 5, Results found: 4, No Results found 1 (No Results/Total: 20.00%)
 ```
 
 **Command**:
@@ -417,8 +428,8 @@ Ignore rule group `kubernetes-system-controller-manager-demo-group`
         └── [1/1] KubeSchedulerDown
             └── [✔] up{job="kube-scheduler"}
 
-Rules validated total: 4
-Selectors total: 4, Results found: 3, No Results found 1 (Failed/Total: 25.00%)
+Groups total: 2, Rules total: 4
+Selectors total: 4, Results found: 3, No Results found 1 (No Results/Total: 25.00%)
 ```
 
 **Command**:
@@ -471,11 +482,10 @@ Output json:
       }
     ],
     "groups_total": 2,
-    "rules_warnings": 3,
     "rules_total": 4,
     "selectors_success_total": 3,
     "selectors_failed_total": 1,
-    "ratio_failed_total": 25.00
+    "ratio_failed_total": 25
   }
 }
 ```
