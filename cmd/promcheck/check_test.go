@@ -4,8 +4,12 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/prometheus/client_golang/api"
+	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	promql "github.com/prometheus/prometheus/promql/parser"
 	"github.com/stretchr/testify/require"
 
@@ -72,6 +76,24 @@ func TestProcessFile_ParsesRecordsAndAlerts(t *testing.T) {
 	require.Len(t, groups[0].Rules, 2)
 	names := []string{groups[0].Rules[0].Name, groups[0].Rules[1].Name}
 	require.ElementsMatch(t, []string{"HighLatency", "job:up:sum"}, names)
+}
+
+func TestInstanceSource_PassesMatchersToRulesAPI(t *testing.T) {
+	var gotMatch []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, r.ParseForm())
+		gotMatch = r.Form["match[]"]
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"success","data":{"groups":[]}}`))
+	}))
+	defer srv.Close()
+
+	client, err := api.NewClient(api.Config{Address: srv.URL})
+	require.NoError(t, err)
+	src := instanceSource{api: prometheusv1.NewAPI(client), matchers: []string{`{team="infra"}`}}
+	_, err = src.load(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, []string{`{team="infra"}`}, gotMatch)
 }
 
 func TestProcessFile_UTF8Names(t *testing.T) {
