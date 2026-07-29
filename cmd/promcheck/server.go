@@ -52,7 +52,9 @@ func (app *promcheckApp) runPromcheckExporter() error {
 
 			return s.ListenAndServe()
 		}, func(_ error) {
-			_ = s.Shutdown(context.TODO())
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = s.Shutdown(shutdownCtx)
 		})
 	}
 	// promcheck
