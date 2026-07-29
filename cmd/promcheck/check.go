@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/api"
@@ -139,72 +140,63 @@ func (app *promcheckApp) run() error {
 	if app.optExporterModeEnabled {
 		return app.runPromcheckExporter()
 	}
-	return app.checkRules()
+	return app.checkRules(context.Background())
 }
 
-func (app *promcheckApp) checkRules() error {
+func (app *promcheckApp) checkRules(ctx context.Context) error {
 	if len(app.optInlineExpressions) > 0 {
-		return app.checkRulesFromInlineQueries()
+		return app.checkRulesFromInlineQueries(ctx)
 	}
 	if app.optFilesRegexp != "" {
-		return app.checkRulesFromRuleFiles()
+		return app.checkRulesFromRuleFiles(ctx)
 	}
-	return app.checkRulesFromPrometheusInstance()
+	return app.checkRulesFromPrometheusInstance(ctx)
 }
 
-func (app *promcheckApp) checkRulesFromRuleFiles() error {
-	matches, err := filepath.Glob(app.optFilesRegexp)
+// ruleSource yields the rule groups to check.
+type ruleSource interface {
+	load(ctx context.Context) ([]promcheck.RuleGroup, error)
+	name() string
+}
+
+// runCheck loads rule groups from src, probes them concurrently, aggregates the
+// results into the report, and handles strict mode. It is shared by all check modes.
+func (app *promcheckApp) runCheck(ctx context.Context, src ruleSource) error {
+	groups, err := src.load(ctx)
 	if err != nil {
-		app.logger.Error("failed to parse rule group file paths", "err", err)
 		return err
 	}
-
-	ruleGroupsToCheck := []promcheck.RuleGroup{}
-	for _, file := range matches {
-		ruleGroups, err := processFile(app.parser, app.logger, file)
-		if err != nil {
-			app.logger.Error("failed to parse rule group files", "err", err)
-			return err
-		}
-		ruleGroupsToCheck = append(ruleGroupsToCheck, ruleGroups...)
-	}
-
-	if len(ruleGroupsToCheck) == 0 {
-		app.logger.Error("no rule groups to check. Please check for --check.file flag spelling mistakes")
+	if len(groups) == 0 {
+		app.logger.Error("no rule groups to check", "source", src.name())
 		return ErrNoRuleGroups
 	}
 
-	var eg errgroup.Group
-	checkResults := []promcheck.CheckResult{}
-	resultChan := make(chan promcheck.CheckResult, len(ruleGroupsToCheck))
+	var (
+		mu           sync.Mutex
+		checkResults []promcheck.CheckResult
+		eg           errgroup.Group
+	)
+	if app.optConcurrency > 0 {
+		eg.SetLimit(app.optConcurrency)
+	}
 
-	for _, group := range ruleGroupsToCheck {
+	for _, group := range groups {
 		group := group // https://golang.org/doc/faq#closures_and_goroutines
 		eg.Go(func() error {
-			checked, err := app.check.CheckRuleGroup(context.TODO(), group)
+			checked, err := app.check.CheckRuleGroup(ctx, group)
 			if err != nil {
-				app.logger.Error("failed to check rule groups", "file", group.File, "err", err)
+				app.logger.Error("failed to check rule group", "file", group.File, "group", group.Name, "err", err)
 				return err
 			}
-			for _, res := range checked {
-				resultChan <- res
-			}
+			mu.Lock()
+			checkResults = append(checkResults, checked...)
+			mu.Unlock()
 			app.report.AddTotalCheckedGroups(1)
 			return nil
 		})
 	}
-
-	go func() {
-		if err := eg.Wait(); err != nil {
-			app.logger.Error("failed to check rule groups", "err", err)
-			close(resultChan)
-			return
-		}
-		close(resultChan)
-	}()
-
-	for res := range resultChan {
-		checkResults = append(checkResults, res)
+	if err := eg.Wait(); err != nil {
+		return err
 	}
 
 	hasExpressionsWithoutResult := false
@@ -222,13 +214,43 @@ func (app *promcheckApp) checkRulesFromRuleFiles() error {
 		}
 	}
 	if hasExpressionsWithoutResult && app.optStrictMode {
-		err := app.report.Dump()
-		if err != nil {
+		if err := app.report.Dump(); err != nil {
 			app.logger.Error("failed to print report", "err", err)
 		}
 		os.Exit(1)
 	}
 	return app.report.Dump()
+}
+
+// fileSource loads rule groups from rule files matched by a glob pattern.
+type fileSource struct {
+	app         *promcheckApp
+	filesRegexp string
+}
+
+func (s fileSource) name() string { return "file" }
+
+func (s fileSource) load(_ context.Context) ([]promcheck.RuleGroup, error) {
+	matches, err := filepath.Glob(s.filesRegexp)
+	if err != nil {
+		s.app.logger.Error("failed to parse rule group file paths", "err", err)
+		return nil, err
+	}
+
+	groups := []promcheck.RuleGroup{}
+	for _, file := range matches {
+		parsed, err := processFile(s.app.parser, s.app.logger, file)
+		if err != nil {
+			s.app.logger.Error("failed to parse rule group files", "err", err)
+			return nil, err
+		}
+		groups = append(groups, parsed...)
+	}
+	return groups, nil
+}
+
+func (app *promcheckApp) checkRulesFromRuleFiles(ctx context.Context) error {
+	return app.runCheck(ctx, fileSource{app: app, filesRegexp: app.optFilesRegexp})
 }
 
 func processFile(p promql.Parser, logger *slog.Logger, file string) ([]promcheck.RuleGroup, error) {
@@ -253,86 +275,39 @@ func rulefmtToPromcheck(fileName string, group rulefmt.RuleGroup) promcheck.Rule
 	return out
 }
 
-func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
+// instanceSource loads rule groups from a live Prometheus instance.
+type instanceSource struct {
+	app *promcheckApp
+}
+
+func (s instanceSource) name() string { return "instance" }
+
+func (s instanceSource) load(ctx context.Context) ([]promcheck.RuleGroup, error) {
 	client, err := api.NewClient(api.Config{
-		Address:      app.optPrometheusURL,
-		RoundTripper: app.roundTripper,
+		Address:      s.app.optPrometheusURL,
+		RoundTripper: s.app.roundTripper,
 	})
 	if err != nil {
-		app.logger.Error("failed to create Prometheus client", "err", err)
-		return err
+		s.app.logger.Error("failed to create Prometheus client", "err", err)
+		return nil, err
 	}
 	promAPI := prometheusv1.NewAPI(client)
-	apiResponse, err := promAPI.Rules(context.TODO(), nil) // TODO: Can we somehow only load the ones we're interested in if filtered?
+	// matchers stay nil for now; server-side matcher filtering arrives in Task 4.1.
+	apiResponse, err := promAPI.Rules(ctx, nil)
 	if err != nil {
-		app.logger.Error("failed to receive rules from prometheus instance", "err", err)
-		return err
+		s.app.logger.Error("failed to receive rules from prometheus instance", "err", err)
+		return nil, err
 	}
 
-	ruleGroupsToCheck := make([]promcheck.RuleGroup, 0, len(apiResponse.Groups))
+	groups := make([]promcheck.RuleGroup, 0, len(apiResponse.Groups))
 	for _, group := range apiResponse.Groups {
-		ruleGroupsToCheck = append(ruleGroupsToCheck, prometheusv1ToPromcheck(group))
+		groups = append(groups, prometheusv1ToPromcheck(group))
 	}
+	return groups, nil
+}
 
-	if len(ruleGroupsToCheck) == 0 {
-		app.logger.Error("no rule groups to check. Please check whether the Prometheus instance contains any rules.")
-		return ErrNoRuleGroups
-	}
-
-	var eg errgroup.Group
-	checkResults := []promcheck.CheckResult{}
-	resultChan := make(chan promcheck.CheckResult, len(ruleGroupsToCheck))
-
-	for _, group := range ruleGroupsToCheck {
-		group := group // https://golang.org/doc/faq#closures_and_goroutines
-		eg.Go(func() error {
-			checked, err := app.check.CheckRuleGroup(context.TODO(), group)
-			if err != nil {
-				app.logger.Error("failed to check rule groups", "file", group.File, "err", err)
-				return err
-			}
-			for _, res := range checked {
-				resultChan <- res
-			}
-			app.report.AddTotalCheckedGroups(1)
-			return nil
-		})
-	}
-
-	go func() {
-		if err := eg.Wait(); err != nil {
-			app.logger.Error("failed to check rule groups", "err", err)
-			close(resultChan)
-			return
-		}
-		close(resultChan)
-	}()
-
-	for res := range resultChan {
-		checkResults = append(checkResults, res)
-	}
-	hasExpressionsWithoutResult := false
-	for _, cr := range checkResults {
-		app.report.AddSection(
-			cr.File,
-			cr.Group,
-			cr.Name,
-			cr.Expression,
-			cr.NoResults,
-			cr.Results,
-		)
-		if len(cr.NoResults) > 0 {
-			hasExpressionsWithoutResult = true
-		}
-	}
-	if hasExpressionsWithoutResult && app.optStrictMode {
-		err := app.report.Dump()
-		if err != nil {
-			app.logger.Error("failed to print report", "err", err)
-		}
-		os.Exit(1)
-	}
-	return app.report.Dump()
+func (app *promcheckApp) checkRulesFromPrometheusInstance(ctx context.Context) error {
+	return app.runCheck(ctx, instanceSource{app: app})
 }
 
 func prometheusv1ToPromcheck(group prometheusv1.RuleGroup) promcheck.RuleGroup {
@@ -358,51 +333,30 @@ func prometheusv1ToPromcheck(group prometheusv1.RuleGroup) promcheck.RuleGroup {
 	return convertedRuleGroup
 }
 
-func (app *promcheckApp) checkRulesFromInlineQueries() error {
+// inlineSource builds a single synthetic rule group from inline PromQL queries.
+type inlineSource struct {
+	expressions []string
+}
+
+func (s inlineSource) name() string { return "inline" }
+
+func (s inlineSource) load(_ context.Context) ([]promcheck.RuleGroup, error) {
 	group := promcheck.RuleGroup{
 		Name:  "[inline]",
 		File:  "[manual]",
 		Rules: []promcheck.Rule{},
 	}
-	for i, query := range app.optInlineExpressions {
+	for i, query := range s.expressions {
 		group.Rules = append(group.Rules, promcheck.Rule{
 			Name:       fmt.Sprintf("query-%d", i),
 			Expression: query,
 		})
 	}
+	return []promcheck.RuleGroup{group}, nil
+}
 
-	checkResults := []promcheck.CheckResult{}
-	checked, err := app.check.CheckRuleGroup(context.TODO(), group)
-	if err != nil {
-		app.logger.Error("failed to check rule groups", "file", group.File, "err", err)
-		return err
-	}
-
-	checkResults = append(checkResults, checked...)
-	app.report.AddTotalCheckedGroups(1)
-
-	hasExpressionsWithoutResult := false
-	for _, cr := range checkResults {
-		app.report.AddSection(
-			cr.File,
-			cr.Group,
-			cr.Name,
-			cr.Expression,
-			cr.NoResults,
-			cr.Results,
-		)
-		if len(cr.NoResults) > 0 {
-			hasExpressionsWithoutResult = true
-		}
-	}
-	if hasExpressionsWithoutResult && app.optStrictMode {
-		err := app.report.Dump()
-		if err != nil {
-			app.logger.Error("failed to print report", "err", err)
-		}
-		os.Exit(1)
-	}
-	return app.report.Dump()
+func (app *promcheckApp) checkRulesFromInlineQueries(ctx context.Context) error {
+	return app.runCheck(ctx, inlineSource{expressions: app.optInlineExpressions})
 }
 
 type basicAuthRoundTripper struct {
