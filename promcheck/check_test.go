@@ -174,6 +174,16 @@ func Test_isIgnoredGroup(t *testing.T) {
 	}
 }
 
+func TestPrometheusRulesChecker_IsIgnoredGroup(t *testing.T) {
+	prc, err := NewPrometheusRulesChecker(PrometheusRulesCheckerConfig{
+		IgnoredGroupsRegexp: []string{"^ignore-me$"},
+	}, nil)
+	require.NoError(t, err)
+
+	require.True(t, prc.IsIgnoredGroup("ignore-me"))
+	require.False(t, prc.IsIgnoredGroup("keep"))
+}
+
 func Test_isIgnoredSelector(t *testing.T) {
 	type args struct {
 		ignoredRegexp []string

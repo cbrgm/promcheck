@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -35,6 +36,7 @@ type Reporter interface {
 
 type Checker interface {
 	CheckRuleGroup(ctx context.Context, group promcheck.RuleGroup) ([]promcheck.CheckResult, error)
+	IsIgnoredGroup(name string) bool
 }
 
 type promcheckApp struct {
@@ -172,6 +174,12 @@ func (app *promcheckApp) runCheck(ctx context.Context, src ruleSource) error {
 		return ErrNoRuleGroups
 	}
 
+	// Filter out ignored groups up front so they are neither probed, nor
+	// counted, nor rendered.
+	groups = slices.DeleteFunc(groups, func(g promcheck.RuleGroup) bool {
+		return app.check.IsIgnoredGroup(g.Name)
+	})
+
 	var (
 		mu           sync.Mutex
 		checkResults []promcheck.CheckResult
@@ -212,7 +220,7 @@ func (app *promcheckApp) runCheck(ctx context.Context, src ruleSource) error {
 			hasExpressionsWithoutResult = true
 		}
 	}
-	if hasExpressionsWithoutResult && app.optStrictMode {
+	if hasExpressionsWithoutResult && app.optStrictMode && !app.optExporterModeEnabled {
 		if err := app.report.Dump(); err != nil {
 			app.logger.Error("failed to print report", "err", err)
 		}

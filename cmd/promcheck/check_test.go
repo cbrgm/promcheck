@@ -6,6 +6,10 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
+	"slices"
+	"sync"
 	"testing"
 
 	"github.com/prometheus/client_golang/api"
@@ -20,19 +24,35 @@ func newTestLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-type fakeChecker struct{ res []promcheck.CheckResult }
+type fakeChecker struct {
+	res []promcheck.CheckResult
 
-func (f *fakeChecker) CheckRuleGroup(_ context.Context, _ promcheck.RuleGroup) ([]promcheck.CheckResult, error) {
+	// ignoredGroups names the groups IsIgnoredGroup reports as ignored.
+	ignoredGroups []string
+
+	mu            sync.Mutex
+	checkedGroups []string
+}
+
+func (f *fakeChecker) IsIgnoredGroup(name string) bool {
+	return slices.Contains(f.ignoredGroups, name)
+}
+
+func (f *fakeChecker) CheckRuleGroup(_ context.Context, group promcheck.RuleGroup) ([]promcheck.CheckResult, error) {
+	f.mu.Lock()
+	f.checkedGroups = append(f.checkedGroups, group.Name)
+	f.mu.Unlock()
 	return f.res, nil
 }
 
 type fakeReporter struct {
-	sections int
-	dumped   bool
+	sections    int
+	groupsTotal int
+	dumped      bool
 }
 
 func (r *fakeReporter) AddSection(_, _, _, _ string, _, _ []string) { r.sections++ }
-func (r *fakeReporter) AddTotalCheckedGroups(int)                   {}
+func (r *fakeReporter) AddTotalCheckedGroups(count int)             { r.groupsTotal = count }
 func (r *fakeReporter) Dump() error                                 { r.dumped = true; return nil }
 
 type staticSource struct{ groups []promcheck.RuleGroup }
@@ -57,6 +77,69 @@ func TestRunCheck_AddsSectionsAndDumps(t *testing.T) {
 	require.NoError(t, app.runCheck(t.Context(), src))
 	require.Equal(t, 1, rep.sections)
 	require.True(t, rep.dumped)
+}
+
+func TestRunCheck_SkipsIgnoredGroups(t *testing.T) {
+	rep := &fakeReporter{}
+	checker := &fakeChecker{
+		res:           []promcheck.CheckResult{{Name: "r", Results: []string{`up`}}},
+		ignoredGroups: []string{"ignore-me"},
+	}
+	app := &promcheckApp{check: checker, report: rep, logger: newTestLogger()}
+	src := staticSource{groups: []promcheck.RuleGroup{
+		{Name: "ignore-me", Rules: []promcheck.Rule{{Name: "r1", Expression: "up"}}},
+		{Name: "keep", Rules: []promcheck.Rule{{Name: "r2", Expression: "up"}}},
+	}}
+	require.NoError(t, app.runCheck(t.Context(), src))
+
+	require.Equal(t, []string{"keep"}, checker.checkedGroups, "ignored group must not be probed")
+	require.Equal(t, 1, rep.groupsTotal, "ignored group must not be counted")
+	require.Equal(t, 1, rep.sections, "ignored group must not produce sections")
+}
+
+func TestRunCheck_StrictModeDoesNotExitInExporterMode(t *testing.T) {
+	rep := &fakeReporter{}
+	app := &promcheckApp{
+		check:                  &fakeChecker{res: []promcheck.CheckResult{{Name: "r", NoResults: []string{`up`}}}},
+		report:                 rep,
+		logger:                 newTestLogger(),
+		optStrictMode:          true,
+		optExporterModeEnabled: true,
+	}
+	src := staticSource{groups: []promcheck.RuleGroup{{Name: "g", Rules: []promcheck.Rule{{Name: "r", Expression: "up"}}}}}
+
+	// Must return normally (not os.Exit the test process) even though there
+	// are NoResults and strict mode is on, because the exporter mode is a
+	// long-running process that must not die on the first dead rule.
+	err := app.runCheck(t.Context(), src)
+	require.NoError(t, err)
+	require.True(t, rep.dumped)
+}
+
+// TestRunCheck_StrictModeExitsOneShot verifies that one-shot --strict mode
+// still exits the process with status 1 when a rule has no results. Since
+// os.Exit terminates the process, this is exercised via a subprocess.
+func TestRunCheck_StrictModeExitsOneShot(t *testing.T) {
+	if os.Getenv("PROMCHECK_TEST_STRICT_EXIT") == "1" {
+		rep := &fakeReporter{}
+		app := &promcheckApp{
+			check:         &fakeChecker{res: []promcheck.CheckResult{{Name: "r", NoResults: []string{`up`}}}},
+			report:        rep,
+			logger:        newTestLogger(),
+			optStrictMode: true,
+		}
+		src := staticSource{groups: []promcheck.RuleGroup{{Name: "g", Rules: []promcheck.Rule{{Name: "r", Expression: "up"}}}}}
+		_ = app.runCheck(t.Context(), src)
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestRunCheck_StrictModeExitsOneShot")
+	cmd.Env = append(os.Environ(), "PROMCHECK_TEST_STRICT_EXIT=1")
+	err := cmd.Run()
+
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	require.Equal(t, 1, exitErr.ExitCode())
 }
 
 func TestCheckRulesFromRuleFiles_EmptyReturnsError(t *testing.T) {
