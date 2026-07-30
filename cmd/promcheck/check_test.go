@@ -17,7 +17,7 @@ import (
 	promql "github.com/prometheus/prometheus/promql/parser"
 	"github.com/stretchr/testify/require"
 
-	"github.com/cbrgm/promcheck/promcheck"
+	"github.com/cbrgm/promcheck/internal/checker"
 )
 
 func newTestLogger() *slog.Logger {
@@ -25,7 +25,7 @@ func newTestLogger() *slog.Logger {
 }
 
 type fakeChecker struct {
-	res []promcheck.CheckResult
+	res []checker.CheckResult
 
 	// ignoredGroups names the groups IsIgnoredGroup reports as ignored.
 	ignoredGroups []string
@@ -38,7 +38,7 @@ func (f *fakeChecker) IsIgnoredGroup(name string) bool {
 	return slices.Contains(f.ignoredGroups, name)
 }
 
-func (f *fakeChecker) CheckRuleGroup(_ context.Context, group promcheck.RuleGroup) ([]promcheck.CheckResult, error) {
+func (f *fakeChecker) CheckRuleGroup(_ context.Context, group checker.RuleGroup) ([]checker.CheckResult, error) {
 	f.mu.Lock()
 	f.checkedGroups = append(f.checkedGroups, group.Name)
 	f.mu.Unlock()
@@ -55,10 +55,10 @@ func (r *fakeReporter) AddSection(_, _, _, _ string, _, _ []string) { r.sections
 func (r *fakeReporter) AddTotalCheckedGroups(count int)             { r.groupsTotal = count }
 func (r *fakeReporter) Dump() error                                 { r.dumped = true; return nil }
 
-type staticSource struct{ groups []promcheck.RuleGroup }
+type staticSource struct{ groups []checker.RuleGroup }
 
-func (s staticSource) load(context.Context) ([]promcheck.RuleGroup, error) { return s.groups, nil }
-func (s staticSource) name() string                                        { return "static" }
+func (s staticSource) load(context.Context) ([]checker.RuleGroup, error) { return s.groups, nil }
+func (s staticSource) name() string                                      { return "static" }
 
 func TestRunCheck_EmptyReturnsErrNoRuleGroups(t *testing.T) {
 	app := &promcheckApp{check: &fakeChecker{}, report: &fakeReporter{}, logger: newTestLogger()}
@@ -69,11 +69,11 @@ func TestRunCheck_EmptyReturnsErrNoRuleGroups(t *testing.T) {
 func TestRunCheck_AddsSectionsAndDumps(t *testing.T) {
 	rep := &fakeReporter{}
 	app := &promcheckApp{
-		check:  &fakeChecker{res: []promcheck.CheckResult{{Name: "r", Results: []string{`up`}}}},
+		check:  &fakeChecker{res: []checker.CheckResult{{Name: "r", Results: []string{`up`}}}},
 		report: rep,
 		logger: newTestLogger(),
 	}
-	src := staticSource{groups: []promcheck.RuleGroup{{Name: "g", Rules: []promcheck.Rule{{Name: "r", Expression: "up"}}}}}
+	src := staticSource{groups: []checker.RuleGroup{{Name: "g", Rules: []checker.Rule{{Name: "r", Expression: "up"}}}}}
 	require.NoError(t, app.runCheck(t.Context(), src))
 	require.Equal(t, 1, rep.sections)
 	require.True(t, rep.dumped)
@@ -81,18 +81,18 @@ func TestRunCheck_AddsSectionsAndDumps(t *testing.T) {
 
 func TestRunCheck_SkipsIgnoredGroups(t *testing.T) {
 	rep := &fakeReporter{}
-	checker := &fakeChecker{
-		res:           []promcheck.CheckResult{{Name: "r", Results: []string{`up`}}},
+	fc := &fakeChecker{
+		res:           []checker.CheckResult{{Name: "r", Results: []string{`up`}}},
 		ignoredGroups: []string{"ignore-me"},
 	}
-	app := &promcheckApp{check: checker, report: rep, logger: newTestLogger()}
-	src := staticSource{groups: []promcheck.RuleGroup{
-		{Name: "ignore-me", Rules: []promcheck.Rule{{Name: "r1", Expression: "up"}}},
-		{Name: "keep", Rules: []promcheck.Rule{{Name: "r2", Expression: "up"}}},
+	app := &promcheckApp{check: fc, report: rep, logger: newTestLogger()}
+	src := staticSource{groups: []checker.RuleGroup{
+		{Name: "ignore-me", Rules: []checker.Rule{{Name: "r1", Expression: "up"}}},
+		{Name: "keep", Rules: []checker.Rule{{Name: "r2", Expression: "up"}}},
 	}}
 	require.NoError(t, app.runCheck(t.Context(), src))
 
-	require.Equal(t, []string{"keep"}, checker.checkedGroups, "ignored group must not be probed")
+	require.Equal(t, []string{"keep"}, fc.checkedGroups, "ignored group must not be probed")
 	require.Equal(t, 1, rep.groupsTotal, "ignored group must not be counted")
 	require.Equal(t, 1, rep.sections, "ignored group must not produce sections")
 }
@@ -100,13 +100,13 @@ func TestRunCheck_SkipsIgnoredGroups(t *testing.T) {
 func TestRunCheck_StrictModeDoesNotExitInExporterMode(t *testing.T) {
 	rep := &fakeReporter{}
 	app := &promcheckApp{
-		check:                  &fakeChecker{res: []promcheck.CheckResult{{Name: "r", NoResults: []string{`up`}}}},
+		check:                  &fakeChecker{res: []checker.CheckResult{{Name: "r", NoResults: []string{`up`}}}},
 		report:                 rep,
 		logger:                 newTestLogger(),
 		optStrictMode:          true,
 		optExporterModeEnabled: true,
 	}
-	src := staticSource{groups: []promcheck.RuleGroup{{Name: "g", Rules: []promcheck.Rule{{Name: "r", Expression: "up"}}}}}
+	src := staticSource{groups: []checker.RuleGroup{{Name: "g", Rules: []checker.Rule{{Name: "r", Expression: "up"}}}}}
 
 	// Must return normally (not os.Exit the test process) even though there
 	// are NoResults and strict mode is on, because the exporter mode is a
@@ -123,12 +123,12 @@ func TestRunCheck_StrictModeExitsOneShot(t *testing.T) {
 	if os.Getenv("PROMCHECK_TEST_STRICT_EXIT") == "1" {
 		rep := &fakeReporter{}
 		app := &promcheckApp{
-			check:         &fakeChecker{res: []promcheck.CheckResult{{Name: "r", NoResults: []string{`up`}}}},
+			check:         &fakeChecker{res: []checker.CheckResult{{Name: "r", NoResults: []string{`up`}}}},
 			report:        rep,
 			logger:        newTestLogger(),
 			optStrictMode: true,
 		}
-		src := staticSource{groups: []promcheck.RuleGroup{{Name: "g", Rules: []promcheck.Rule{{Name: "r", Expression: "up"}}}}}
+		src := staticSource{groups: []checker.RuleGroup{{Name: "g", Rules: []checker.Rule{{Name: "r", Expression: "up"}}}}}
 		_ = app.runCheck(t.Context(), src)
 		return
 	}

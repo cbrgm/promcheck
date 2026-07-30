@@ -11,7 +11,7 @@ import (
 
 	"github.com/oklog/run"
 
-	"github.com/cbrgm/promcheck/promcheck/metrics"
+	"github.com/cbrgm/promcheck/internal/metrics"
 )
 
 func (app *promcheckApp) runPromcheckExporter() error {
