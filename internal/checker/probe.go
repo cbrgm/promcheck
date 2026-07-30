@@ -1,4 +1,4 @@
-package promcheck
+package checker
 
 import (
 	"context"

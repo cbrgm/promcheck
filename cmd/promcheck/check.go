@@ -20,9 +20,9 @@ import (
 	promql "github.com/prometheus/prometheus/promql/parser"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/cbrgm/promcheck/promcheck"
-	"github.com/cbrgm/promcheck/promcheck/metrics"
-	"github.com/cbrgm/promcheck/promcheck/report"
+	"github.com/cbrgm/promcheck/internal/checker"
+	"github.com/cbrgm/promcheck/internal/metrics"
+	"github.com/cbrgm/promcheck/internal/report"
 )
 
 // ErrNoRuleGroups is returned when a check run finds no rule groups to probe.
@@ -35,7 +35,7 @@ type Reporter interface {
 }
 
 type Checker interface {
-	CheckRuleGroup(ctx context.Context, group promcheck.RuleGroup) ([]promcheck.CheckResult, error)
+	CheckRuleGroup(ctx context.Context, group checker.RuleGroup) ([]checker.CheckResult, error)
 	IsIgnoredGroup(name string) bool
 }
 
@@ -85,8 +85,8 @@ func newPromcheck(config *config, logger *slog.Logger) (*promcheckApp, error) {
 	}
 
 	promAPI := prometheusv1.NewAPI(client)
-	checker, err := promcheck.NewPrometheusRulesChecker(
-		promcheck.PrometheusRulesCheckerConfig{
+	rulesChecker, err := checker.NewPrometheusRulesChecker(
+		checker.PrometheusRulesCheckerConfig{
 			PrometheusURL:          config.PrometheusURL,
 			IgnoredSelectorsRegexp: config.CheckIgnoredSelectorsRegexp,
 			IgnoredGroupsRegexp:    config.CheckIgnoredGroupsRegexp,
@@ -130,7 +130,7 @@ func newPromcheck(config *config, logger *slog.Logger) (*promcheckApp, error) {
 		optStrictMode:                   config.StrictMode,
 
 		// internal
-		check:        checker,
+		check:        rulesChecker,
 		report:       reporter,
 		logger:       logger,
 		metrics:      promMetrics,
@@ -158,7 +158,7 @@ func (app *promcheckApp) checkRules(ctx context.Context) error {
 
 // ruleSource yields the rule groups to check.
 type ruleSource interface {
-	load(ctx context.Context) ([]promcheck.RuleGroup, error)
+	load(ctx context.Context) ([]checker.RuleGroup, error)
 	name() string
 }
 
@@ -176,13 +176,13 @@ func (app *promcheckApp) runCheck(ctx context.Context, src ruleSource) error {
 
 	// Filter out ignored groups up front so they are neither probed, nor
 	// counted, nor rendered.
-	groups = slices.DeleteFunc(groups, func(g promcheck.RuleGroup) bool {
+	groups = slices.DeleteFunc(groups, func(g checker.RuleGroup) bool {
 		return app.check.IsIgnoredGroup(g.Name)
 	})
 
 	var (
 		mu           sync.Mutex
-		checkResults []promcheck.CheckResult
+		checkResults []checker.CheckResult
 		eg           errgroup.Group
 	)
 
@@ -237,14 +237,14 @@ type fileSource struct {
 
 func (s fileSource) name() string { return "file" }
 
-func (s fileSource) load(_ context.Context) ([]promcheck.RuleGroup, error) {
+func (s fileSource) load(_ context.Context) ([]checker.RuleGroup, error) {
 	matches, err := filepath.Glob(s.filesRegexp)
 	if err != nil {
 		s.app.logger.Error("failed to parse rule group file paths", "err", err)
 		return nil, err
 	}
 
-	groups := []promcheck.RuleGroup{}
+	groups := []checker.RuleGroup{}
 	for _, file := range matches {
 		parsed, err := processFile(s.app.parser, s.app.logger, file)
 		if err != nil {
@@ -260,24 +260,24 @@ func (app *promcheckApp) checkRulesFromRuleFiles(ctx context.Context) error {
 	return app.runCheck(ctx, fileSource{app: app, filesRegexp: app.optFilesRegexp})
 }
 
-func processFile(p promql.Parser, logger *slog.Logger, file string) ([]promcheck.RuleGroup, error) {
+func processFile(p promql.Parser, logger *slog.Logger, file string) ([]checker.RuleGroup, error) {
 	ruleGroups, errs := rulefmt.ParseFile(file, false, model.UTF8Validation, p, logger)
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("%s: %w", file, errors.Join(errs...))
 	}
 
-	converted := make([]promcheck.RuleGroup, 0, len(ruleGroups.Groups))
+	converted := make([]checker.RuleGroup, 0, len(ruleGroups.Groups))
 	for _, group := range ruleGroups.Groups {
 		converted = append(converted, rulefmtToPromcheck(file, group))
 	}
 	return converted, nil
 }
 
-func rulefmtToPromcheck(fileName string, group rulefmt.RuleGroup) promcheck.RuleGroup {
-	out := promcheck.RuleGroup{Name: group.Name, File: fileName, Rules: make([]promcheck.Rule, 0, len(group.Rules))}
+func rulefmtToPromcheck(fileName string, group rulefmt.RuleGroup) checker.RuleGroup {
+	out := checker.RuleGroup{Name: group.Name, File: fileName, Rules: make([]checker.Rule, 0, len(group.Rules))}
 	for _, rule := range group.Rules {
 		name := cmp.Or(rule.Record, rule.Alert)
-		out.Rules = append(out.Rules, promcheck.Rule{Name: name, Expression: rule.Expr})
+		out.Rules = append(out.Rules, checker.Rule{Name: name, Expression: rule.Expr})
 	}
 	return out
 }
@@ -291,14 +291,14 @@ type instanceSource struct {
 
 func (s instanceSource) name() string { return "instance" }
 
-func (s instanceSource) load(ctx context.Context) ([]promcheck.RuleGroup, error) {
+func (s instanceSource) load(ctx context.Context) ([]checker.RuleGroup, error) {
 	apiResponse, err := s.api.Rules(ctx, s.matchers)
 	if err != nil {
 		s.app.logger.Error("failed to receive rules from prometheus instance", "err", err)
 		return nil, err
 	}
 
-	groups := make([]promcheck.RuleGroup, 0, len(apiResponse.Groups))
+	groups := make([]checker.RuleGroup, 0, len(apiResponse.Groups))
 	for _, group := range apiResponse.Groups {
 		groups = append(groups, prometheusv1ToPromcheck(group))
 	}
@@ -318,21 +318,21 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance(ctx context.Context) e
 	return app.runCheck(ctx, instanceSource{app: app, api: promAPI, matchers: app.optCheckMatch})
 }
 
-func prometheusv1ToPromcheck(group prometheusv1.RuleGroup) promcheck.RuleGroup {
-	convertedRuleGroup := promcheck.RuleGroup{
+func prometheusv1ToPromcheck(group prometheusv1.RuleGroup) checker.RuleGroup {
+	convertedRuleGroup := checker.RuleGroup{
 		Name:  group.Name,
 		File:  group.File,
-		Rules: []promcheck.Rule{},
+		Rules: []checker.Rule{},
 	}
 	for _, rule := range group.Rules {
 		switch v := rule.(type) {
 		case prometheusv1.RecordingRule:
-			convertedRuleGroup.Rules = append(convertedRuleGroup.Rules, promcheck.Rule{
+			convertedRuleGroup.Rules = append(convertedRuleGroup.Rules, checker.Rule{
 				Name:       v.Name,
 				Expression: v.Query,
 			})
 		case prometheusv1.AlertingRule:
-			convertedRuleGroup.Rules = append(convertedRuleGroup.Rules, promcheck.Rule{
+			convertedRuleGroup.Rules = append(convertedRuleGroup.Rules, checker.Rule{
 				Name:       v.Name,
 				Expression: v.Query,
 			})
@@ -348,19 +348,19 @@ type inlineSource struct {
 
 func (s inlineSource) name() string { return "inline" }
 
-func (s inlineSource) load(_ context.Context) ([]promcheck.RuleGroup, error) {
-	group := promcheck.RuleGroup{
+func (s inlineSource) load(_ context.Context) ([]checker.RuleGroup, error) {
+	group := checker.RuleGroup{
 		Name:  "[inline]",
 		File:  "[manual]",
-		Rules: []promcheck.Rule{},
+		Rules: []checker.Rule{},
 	}
 	for i, query := range s.expressions {
-		group.Rules = append(group.Rules, promcheck.Rule{
+		group.Rules = append(group.Rules, checker.Rule{
 			Name:       fmt.Sprintf("query-%d", i),
 			Expression: query,
 		})
 	}
-	return []promcheck.RuleGroup{group}, nil
+	return []checker.RuleGroup{group}, nil
 }
 
 func (app *promcheckApp) checkRulesFromInlineQueries(ctx context.Context) error {

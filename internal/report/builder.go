@@ -10,7 +10,7 @@ import (
 	"github.com/fatih/color"
 	"gopkg.in/yaml.v3"
 
-	"github.com/cbrgm/promcheck/promcheck/metrics"
+	"github.com/cbrgm/promcheck/internal/metrics"
 )
 
 const (
