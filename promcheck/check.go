@@ -183,6 +183,12 @@ func (prc *PrometheusRulesChecker) CheckRuleGroup(ctx context.Context, group Rul
 	return results, nil
 }
 
+// IsIgnoredGroup reports whether the given group name matches any of the
+// configured IgnoredGroupsRegexp patterns.
+func (prc *PrometheusRulesChecker) IsIgnoredGroup(name string) bool {
+	return isIgnoredGroup(prc.ignoredGroupsRegexp, name)
+}
+
 func isIgnoredGroup(patterns []*regexp.Regexp, group string) bool {
 	return isIgnored(patterns, group)
 }

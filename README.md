@@ -428,7 +428,7 @@ Ignore rule group `kubernetes-system-controller-manager-demo-group`
         └── [1/1] KubeSchedulerDown
             └── [✔] up{job="kube-scheduler"}
 
-Groups total: 2, Rules total: 4
+Groups total: 2, Rules total: 3
 Selectors total: 4, Results found: 3, No Results found 1 (No Results/Total: 25.00%)
 ```
 
@@ -482,7 +482,7 @@ Output json:
       }
     ],
     "groups_total": 2,
-    "rules_total": 4,
+    "rules_total": 3,
     "selectors_success_total": 3,
     "selectors_failed_total": 1,
     "ratio_failed_total": 25
