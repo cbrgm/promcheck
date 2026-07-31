@@ -50,6 +50,10 @@ type Builder struct {
 	// colorExplicit is true once WithColor/WithoutColor has been applied,
 	// so NewBuilder knows not to overwrite it with its own auto-detection.
 	colorExplicit bool
+
+	// onlyFailing restricts rendered sections (tree/json/yaml) to ones with
+	// at least one selector without a result. Summary totals are unaffected.
+	onlyFailing bool
 }
 
 // NewBuilder returns a new Builder.
@@ -103,6 +107,15 @@ func WithColor(enabled bool) BuilderOption {
 	return func(b *Builder) {
 		b.useColor = enabled
 		b.colorExplicit = true
+	}
+}
+
+// WithOnlyFailing restricts rendered output (tree, json, yaml) to sections
+// that have at least one selector without a result. Summary totals (groups,
+// rules, selectors, ratio) continue to reflect the full run.
+func WithOnlyFailing() BuilderOption {
+	return func(b *Builder) {
+		b.onlyFailing = true
 	}
 }
 
@@ -227,10 +240,36 @@ func (b *Builder) AddTotalCheckedGroups(count int) {
 	b.Report.TotalGroups += count
 }
 
+// reportEnvelope mirrors the shape Builder marshals to json/yaml (a single
+// "promcheck" key), decoupled from Builder itself so rendering can swap in a
+// filtered Report (see renderedReport) without mutating the Builder's state.
+type reportEnvelope struct {
+	Report Report `json:"promcheck" yaml:"promcheck"`
+}
+
+// renderedReport returns the Report to marshal/print. When onlyFailing is
+// set, sections without a failing selector are dropped from the copy, but
+// the summary totals (which are accumulated independently in AddSection)
+// still reflect every section from the full run.
+func (b *Builder) renderedReport() Report {
+	r := b.Report
+	if !b.onlyFailing {
+		return r
+	}
+	filtered := make(Sections, 0, len(r.Sections))
+	for _, s := range r.Sections {
+		if len(s.NoResults) > 0 {
+			filtered = append(filtered, s)
+		}
+	}
+	r.Sections = filtered
+	return r
+}
+
 // ToYAML returns the report in yaml format.
 func (b *Builder) ToYAML() (string, error) {
 	b.finalize()
-	raw, err := yaml.Marshal(b)
+	raw, err := yaml.Marshal(reportEnvelope{Report: b.renderedReport()})
 	if err != nil {
 		return "", err
 	}
@@ -240,7 +279,7 @@ func (b *Builder) ToYAML() (string, error) {
 // ToJSON returns the report in json format.
 func (b *Builder) ToJSON() (string, error) {
 	b.finalize()
-	raw, err := json.MarshalIndent(b, "", "  ")
+	raw, err := json.MarshalIndent(reportEnvelope{Report: b.renderedReport()}, "", "  ")
 	if err != nil {
 		return "", err
 	}

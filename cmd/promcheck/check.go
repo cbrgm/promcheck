@@ -114,6 +114,9 @@ func newPromcheck(config *config, logger *slog.Logger) (*promcheckApp, error) {
 		report.WithMetrics(promMetrics),
 		report.WithColor(useColor),
 	}
+	if config.OutputOnlyFailing {
+		reportOptions = append(reportOptions, report.WithOnlyFailing())
+	}
 	reporter := report.NewBuilder(reportOptions...)
 
 	return &promcheckApp{

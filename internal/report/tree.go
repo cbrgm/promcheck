@@ -150,6 +150,9 @@ func (b *Builder) ToTree() (string, error) {
 		failed  []string
 	})
 	for _, section := range b.Report.Sections {
+		if b.onlyFailing && len(section.NoResults) == 0 {
+			continue
+		}
 		if nodeMap[section.File] == nil {
 			nodeMap[section.File] = make(map[string]map[string]struct {
 				success []string
