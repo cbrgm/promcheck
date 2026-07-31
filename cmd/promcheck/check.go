@@ -106,12 +106,13 @@ func newPromcheck(config *config, logger *slog.Logger) (*promcheckApp, error) {
 		PrometheusRegistry:   nil,
 	})
 
+	// Color only when writing to a real terminal, NO_COLOR isn't set (see
+	// no-color.org), and the user didn't pass --output.no-color.
+	useColor := report.IsTTY(os.Stdout) && os.Getenv("NO_COLOR") == "" && !config.OutputNoColor
 	reportOptions := []report.BuilderOption{
 		report.WithFormat(config.OutputFormat),
 		report.WithMetrics(promMetrics),
-	}
-	if config.OutputNoColor {
-		reportOptions = append(reportOptions, report.WithoutColor())
+		report.WithColor(useColor),
 	}
 	reporter := report.NewBuilder(reportOptions...)
 

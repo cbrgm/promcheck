@@ -128,6 +128,19 @@ func (p *treePrinter) printNodes(t []Tree, spaces []bool) string {
 	return result
 }
 
+// colorf renders format/a with the given color attribute, honoring the
+// Builder's per-instance useColor setting instead of the fatih/color
+// package-global switch.
+func (b *Builder) colorf(attr color.Attribute, format string, a ...any) string {
+	c := color.New(attr)
+	if b.useColor {
+		c.EnableColor()
+	} else {
+		c.DisableColor()
+	}
+	return c.Sprintf(format, a...)
+}
+
 // ToTree returns the report as a tree structure in text format.
 func (b *Builder) ToTree() (string, error) {
 	b.finalize()
@@ -165,14 +178,14 @@ func (b *Builder) ToTree() (string, error) {
 		groups := nodeMap[file]
 
 		// tree depth 1: files
-		prefixedFile := fmt.Sprintf("%s %s", color.YellowString("%s", "[file]"), file)
+		prefixedFile := fmt.Sprintf("%s %s", b.colorf(color.FgYellow, "%s", "[file]"), file)
 		fileNode := newNode(prefixedFile)
 
 		for _, group := range sortedKeys(groups) {
 			rules := groups[group]
 
 			// tree depth 2: groups
-			groupLabel := fmt.Sprintf("%s %s", color.YellowString("%s", "[group]"), group)
+			groupLabel := fmt.Sprintf("%s %s", b.colorf(color.FgYellow, "%s", "[group]"), group)
 			groupNode := newNode(groupLabel)
 
 			for _, rule := range sortedKeys(rules) {
@@ -181,7 +194,8 @@ func (b *Builder) ToTree() (string, error) {
 				// tree depth 3: rules
 				prefixedRule := fmt.Sprintf(
 					"%s %s",
-					color.YellowString(
+					b.colorf(
+						color.FgYellow,
 						"[%d/%d]",
 						len(results.success),
 						len(results.success)+len(results.failed),
@@ -192,12 +206,12 @@ func (b *Builder) ToTree() (string, error) {
 
 				// tree dept 4: selectors
 				for _, i := range results.success {
-					prefixedSuccess := color.GreenString("%s %s", "[✔]", i)
+					prefixedSuccess := b.colorf(color.FgGreen, "%s %s", "[✔]", i)
 					ruleNode.AddNode(prefixedSuccess)
 				}
 
 				for _, i := range results.failed {
-					prefixedFailed := color.RedString("%s %s", "[✖]", i)
+					prefixedFailed := b.colorf(color.FgRed, "%s %s", "[✖]", i)
 					ruleNode.AddNode(prefixedFailed)
 				}
 

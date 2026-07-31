@@ -185,6 +185,44 @@ func TestFinalize_SortsSectionsDeterministically(t *testing.T) {
 	}
 }
 
+// ansiEscape is present in fatih/color output whenever colorization is active.
+const ansiEscape = "\x1b["
+
+func newColorTestBuilder(opts ...BuilderOption) (*Builder, *bytes.Buffer) {
+	buf := &bytes.Buffer{}
+	b := NewBuilder(append([]BuilderOption{WithWriter(buf)}, opts...)...)
+	b.AddSection(
+		"f.yaml", "g", "r", "vector(1)",
+		[]string{"failed_selector"},
+		[]string{"ok_selector"},
+	)
+	return b, buf
+}
+
+func TestToTree_ColorForcedOff_NoANSICodes(t *testing.T) {
+	b, _ := newColorTestBuilder(WithoutColor())
+	out, err := b.ToTree()
+	require.NoError(t, err)
+	require.NotContains(t, out, ansiEscape)
+}
+
+func TestToTree_NonTTYWriter_DefaultsToNoColor(t *testing.T) {
+	// bytes.Buffer is never a TTY, so the default (no explicit color option)
+	// must resolve to colorless output, matching NO_COLOR/non-terminal
+	// behavior without a global fatih/color mutation.
+	b, _ := newColorTestBuilder()
+	out, err := b.ToTree()
+	require.NoError(t, err)
+	require.NotContains(t, out, ansiEscape)
+}
+
+func TestToTree_ColorForcedOn_EmitsANSICodes(t *testing.T) {
+	b, _ := newColorTestBuilder(WithColor(true))
+	out, err := b.ToTree()
+	require.NoError(t, err)
+	require.Contains(t, out, ansiEscape)
+}
+
 func TestFinalize_ZeroSelectorsNoNaN(t *testing.T) {
 	b := NewBuilder(WithWriter(io.Discard))
 	// A rule with no selectors: TotalRules > 0, but total selectors == 0.
