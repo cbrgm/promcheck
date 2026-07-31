@@ -2,6 +2,7 @@ package report
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"math"
 	"strings"
@@ -51,8 +52,11 @@ func TestBuilder_DumpJSON(t *testing.T) {
         ]
       }
     ],
+    "groups_total": 0,
     "rules_total": 1,
-    "selectors_success_total": 4
+    "selectors_failed_total": 0,
+    "selectors_success_total": 4,
+    "ratio_failed_total": 0
   }
 }`
 	require.NoError(t, b.DumpJSON())
@@ -105,6 +109,44 @@ Selectors total: 4, Results found: 3, No Results found 1 (No Results/Total: 25.0
 
 	require.NoError(t, b.DumpTree())
 	require.Equal(t, strings.TrimSpace(expected), strings.TrimSpace(buf.String()))
+}
+
+func TestReport_SummaryFieldsAlwaysPresent(t *testing.T) {
+	b := NewBuilder(WithWriter(io.Discard))
+	b.AddSection("f", "g", "r", "vector(1)", nil, []string{"a", "b"})
+
+	raw, err := b.ToJSON()
+	require.NoError(t, err)
+
+	var decoded map[string]map[string]any
+	require.NoError(t, json.Unmarshal([]byte(raw), &decoded))
+	promcheck := decoded["promcheck"]
+
+	for _, key := range []string{
+		"results",
+		"groups_total",
+		"rules_total",
+		"selectors_failed_total",
+		"selectors_success_total",
+		"ratio_failed_total",
+	} {
+		require.Contains(t, promcheck, key, "expected key %q to always be present", key)
+	}
+	require.Equal(t, float64(0), promcheck["selectors_failed_total"])
+	require.Equal(t, float64(0), promcheck["groups_total"])
+}
+
+func TestReport_EmptySectionsMarshalAsEmptyArray(t *testing.T) {
+	b := NewBuilder(WithWriter(io.Discard))
+
+	raw, err := b.ToJSON()
+	require.NoError(t, err)
+	require.Contains(t, raw, `"results": []`)
+	require.NotContains(t, raw, `"results": null`)
+
+	yamlRaw, err := b.ToYAML()
+	require.NoError(t, err)
+	require.Contains(t, yamlRaw, "results: []")
 }
 
 func TestFinalize_ZeroSelectorsNoNaN(t *testing.T) {
