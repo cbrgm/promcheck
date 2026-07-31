@@ -223,6 +223,67 @@ func TestToTree_ColorForcedOn_EmitsANSICodes(t *testing.T) {
 	require.Contains(t, out, ansiEscape)
 }
 
+func newMixedReportBuilder(opts ...BuilderOption) *Builder {
+	b := NewBuilder(append([]BuilderOption{WithWriter(io.Discard), WithoutColor()}, opts...)...)
+	b.AddSection(
+		"a.yaml", "g", "failing-rule", "up == 0",
+		[]string{"failing_selector"},
+		nil,
+	)
+	b.AddSection(
+		"b.yaml", "g", "healthy-rule", "up == 1",
+		nil,
+		[]string{"ok_selector"},
+	)
+	return b
+}
+
+func TestOnlyFailing_TreeAndJSONFilterSections_TotalsUnaffected(t *testing.T) {
+	full := newMixedReportBuilder()
+	filtered := newMixedReportBuilder(WithOnlyFailing())
+
+	fullTree, err := full.ToTree()
+	require.NoError(t, err)
+	require.Contains(t, fullTree, "failing-rule")
+	require.Contains(t, fullTree, "healthy-rule")
+
+	filteredTree, err := filtered.ToTree()
+	require.NoError(t, err)
+	require.Contains(t, filteredTree, "failing-rule")
+	require.NotContains(t, filteredTree, "healthy-rule")
+
+	// Summary must still reflect the full run, not just the rendered subset.
+	require.Contains(t, filteredTree, "Rules total: 2")
+	require.Contains(t, filteredTree, "Selectors total: 2")
+
+	filteredJSON, err := filtered.ToJSON()
+	require.NoError(t, err)
+
+	var decoded struct {
+		Promcheck struct {
+			Results []struct {
+				Name string `json:"name"`
+			} `json:"results"`
+			RulesTotal            int `json:"rules_total"`
+			SelectorsFailedTotal  int `json:"selectors_failed_total"`
+			SelectorsSuccessTotal int `json:"selectors_success_total"`
+		} `json:"promcheck"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(filteredJSON), &decoded))
+
+	require.Len(t, decoded.Promcheck.Results, 1)
+	require.Equal(t, "failing-rule", decoded.Promcheck.Results[0].Name)
+	require.Equal(t, 2, decoded.Promcheck.RulesTotal, "totals must reflect the full run")
+	require.Equal(t, 1, decoded.Promcheck.SelectorsFailedTotal)
+	require.Equal(t, 1, decoded.Promcheck.SelectorsSuccessTotal)
+
+	filteredYAML, err := filtered.ToYAML()
+	require.NoError(t, err)
+	require.Contains(t, filteredYAML, "failing-rule")
+	require.NotContains(t, filteredYAML, "healthy-rule")
+	require.Contains(t, filteredYAML, "rules_total: 2")
+}
+
 func TestFinalize_ZeroSelectorsNoNaN(t *testing.T) {
 	b := NewBuilder(WithWriter(io.Discard))
 	// A rule with no selectors: TotalRules > 0, but total selectors == 0.

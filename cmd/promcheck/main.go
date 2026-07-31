@@ -43,8 +43,9 @@ type config struct {
 	CheckMatch                  []string `name:"check.match" help:"PromQL label matchers to filter rules server-side, e.g. '{team=\"infra\"}'"`
 
 	// output parameters
-	OutputFormat  string `name:"output.format" enum:"graph,json,yaml" default:"graph" help:"The output format to use"`
-	OutputNoColor bool   `name:"output.no-color" default:"false" help:"Toggle colored output"`
+	OutputFormat      string `name:"output.format" enum:"graph,json,yaml" default:"graph" help:"The output format to use"`
+	OutputNoColor     bool   `name:"output.no-color" default:"false" help:"Toggle colored output"`
+	OutputOnlyFailing bool   `name:"output.only-failing" default:"false" help:"Only show rules that have selectors without results"`
 
 	// exporter parameters
 	ExporterModeEnabled          bool   `name:"exporter.enabled" default:"false" help:"Run promcheck as a prometheus exporter"`
