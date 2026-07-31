@@ -116,9 +116,29 @@ func TestRunCheck_StrictModeDoesNotExitInExporterMode(t *testing.T) {
 	require.True(t, rep.dumped)
 }
 
-// TestRunCheck_StrictModeExitsOneShot verifies that one-shot --strict mode
-// still exits the process with status 1 when a rule has no results. Since
-// os.Exit terminates the process, this is exercised via a subprocess.
+// TestRunCheck_StrictModeReturnsErrStrictFindingsOneShot verifies that
+// one-shot --strict mode reports its findings and returns the
+// ErrStrictFindings sentinel instead of exiting the process directly; main()
+// is the only place that turns errors into a process exit code.
+func TestRunCheck_StrictModeReturnsErrStrictFindingsOneShot(t *testing.T) {
+	rep := &fakeReporter{}
+	app := &promcheckApp{
+		check:         &fakeChecker{res: []checker.CheckResult{{Name: "r", NoResults: []string{`up`}}}},
+		report:        rep,
+		logger:        newTestLogger(),
+		optStrictMode: true,
+	}
+	src := staticSource{groups: []checker.RuleGroup{{Name: "g", Rules: []checker.Rule{{Name: "r", Expression: "up"}}}}}
+
+	err := app.runCheck(t.Context(), src)
+	require.ErrorIs(t, err, ErrStrictFindings)
+	require.True(t, rep.dumped, "report must still be dumped before returning the sentinel")
+}
+
+// TestRunCheck_StrictModeExitsOneShot verifies the full contract end to end:
+// a one-shot --strict run with a dead rule exits the process with status 1.
+// Since os.Exit terminates the process, this is exercised via a subprocess
+// that mirrors what main() does with the runCheck result.
 func TestRunCheck_StrictModeExitsOneShot(t *testing.T) {
 	if os.Getenv("PROMCHECK_TEST_STRICT_EXIT") == "1" {
 		rep := &fakeReporter{}
@@ -129,8 +149,8 @@ func TestRunCheck_StrictModeExitsOneShot(t *testing.T) {
 			optStrictMode: true,
 		}
 		src := staticSource{groups: []checker.RuleGroup{{Name: "g", Rules: []checker.Rule{{Name: "r", Expression: "up"}}}}}
-		_ = app.runCheck(t.Context(), src)
-		return
+		err := app.runCheck(t.Context(), src)
+		os.Exit(exitCodeFor(err))
 	}
 
 	cmd := exec.Command(os.Args[0], "-test.run=TestRunCheck_StrictModeExitsOneShot")
