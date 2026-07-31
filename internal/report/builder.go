@@ -46,7 +46,7 @@ type Builder struct {
 // NewBuilder returns a new Builder.
 func NewBuilder(opts ...BuilderOption) *Builder {
 	b := &Builder{
-		Report:  Report{},
+		Report:  Report{Sections: Sections{}},
 		format:  DefaultFormat,
 		writer:  os.Stdout,
 		metrics: metrics.NewDefaultPrometheus(),
@@ -92,22 +92,22 @@ func WithMetrics(metrics metrics.Metrics) BuilderOption {
 // Report represents report data.
 type Report struct {
 	// Sections represents a list of result data
-	Sections Sections `json:"results,omitempty" yaml:"results,omitempty"`
+	Sections Sections `json:"results" yaml:"results"`
 
 	// TotalRules represents the total amount of checked groups
-	TotalGroups int `json:"groups_total,omitempty" yaml:"groups_total,omitempty"`
+	TotalGroups int `json:"groups_total" yaml:"groups_total"`
 
 	// TotalGroups represents the total amount of checked rules
-	TotalRules int `json:"rules_total,omitempty" yaml:"rules_total,omitempty"`
+	TotalRules int `json:"rules_total" yaml:"rules_total"`
 
 	// TotalSelectorsFailed represents the total amount of probed selectors not containing a result value
-	TotalSelectorsFailed int `json:"selectors_failed_total,omitempty" yaml:"selectors_failed_total,omitempty"`
+	TotalSelectorsFailed int `json:"selectors_failed_total" yaml:"selectors_failed_total"`
 
 	// TotalSelectorsSuccess represents the total amount of probed selectors containing a result value
-	TotalSelectorsSuccess int `json:"selectors_success_total,omitempty" yaml:"selectors_success_total,omitempty"`
+	TotalSelectorsSuccess int `json:"selectors_success_total" yaml:"selectors_success_total"`
 
 	// RatioFailedTotal represents the ratio of selectors without a result value / total amount of selectors
-	RatioFailedTotal float32 `json:"ratio_failed_total,omitempty" yaml:"ratio_failed_total,omitempty"`
+	RatioFailedTotal float32 `json:"ratio_failed_total" yaml:"ratio_failed_total"`
 }
 
 // Sections represents a collection of sections.
@@ -156,7 +156,7 @@ func (b *Builder) finalize() {
 
 // clear resets the report.
 func (b *Builder) clear() {
-	b.Report = Report{}
+	b.Report = Report{Sections: Sections{}}
 }
 
 // AddSection adds a new section to the report.
