@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -15,6 +16,21 @@ const (
 	levelInfo  = "info"
 	levelWarn  = "warn"
 	levelError = "error"
+)
+
+// Exit codes. This is the documented promcheck CLI contract: scripts and CI
+// pipelines may depend on these values, so they must not change casually.
+const (
+	// exitOK means the run completed with no findings (or wasn't strict).
+	exitOK = 0
+	// exitFindings means --strict was set and one or more selectors had no results.
+	exitFindings = 1
+	// exitUsage means a usage or configuration error: bad flags, a bad
+	// regexp, or nothing matched to check.
+	exitUsage = 2
+	// exitRuntime means a runtime failure while probing: connection,
+	// query, or parse error.
+	exitRuntime = 3
 )
 
 var (
@@ -80,27 +96,51 @@ func main() {
 
 	logger := newLogger(cfg.LogJSON, cfg.LogLevel)
 
+	os.Exit(runMain(&cfg, logger))
+}
+
+// runMain wires up and executes promcheck, returning the process exit code.
+// It exists separately from main so the exit-code contract can be exercised
+// without an os.Exit call terminating the test process.
+func runMain(cfg *config, logger *slog.Logger) int {
 	// validation
 	if cfg.ExporterInterval < 0 {
 		logger.Error("configuration error", "err", "--exporter.interval must be > 0")
-		os.Exit(1)
+		return exitUsage
 	}
 
 	if cfg.CheckConcurrency < 1 {
 		logger.Error("configuration error", "err", "--check.concurrency must be >= 1")
-		os.Exit(1)
+		return exitUsage
 	}
 
 	// initialize promcheck
-	app, err := newPromcheck(&cfg, logger)
+	app, err := newPromcheck(cfg, logger)
 	if err != nil {
-		os.Exit(1)
+		return exitUsage
 	}
 
-	if err := app.run(); err != nil {
-		os.Exit(1)
+	err = app.run()
+	code := exitCodeFor(err)
+	if code == exitRuntime {
+		logger.Error("promcheck failed", "err", err)
 	}
-	os.Exit(0)
+	return code
+}
+
+// exitCodeFor maps a promcheckApp.run error to the documented exit-code
+// contract (see the exit* constants above).
+func exitCodeFor(err error) int {
+	switch {
+	case err == nil:
+		return exitOK
+	case errors.Is(err, ErrStrictFindings):
+		return exitFindings
+	case errors.Is(err, ErrNoRuleGroups):
+		return exitUsage
+	default:
+		return exitRuntime
+	}
 }
 
 func newLogger(jsonOut bool, lvl string) *slog.Logger {

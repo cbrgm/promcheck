@@ -28,6 +28,11 @@ import (
 // ErrNoRuleGroups is returned when a check run finds no rule groups to probe.
 var ErrNoRuleGroups = errors.New("no rule groups to check")
 
+// ErrStrictFindings is returned by runCheck when --strict is set and one or
+// more selectors had no results. In exporter mode this sentinel is swallowed
+// (runCheck returns nil instead) so a dead rule can't kill the exporter loop.
+var ErrStrictFindings = errors.New("strict: selectors without results found")
+
 type Reporter interface {
 	Dump() error
 	AddSection(file, group, name, expression string, failed, success []string)
@@ -224,11 +229,16 @@ func (app *promcheckApp) runCheck(ctx context.Context, src ruleSource) error {
 			hasExpressionsWithoutResult = true
 		}
 	}
-	if hasExpressionsWithoutResult && app.optStrictMode && !app.optExporterModeEnabled {
+	if hasExpressionsWithoutResult && app.optStrictMode {
 		if err := app.report.Dump(); err != nil {
 			app.logger.Error("failed to print report", "err", err)
 		}
-		os.Exit(1)
+		if app.optExporterModeEnabled {
+			// The exporter is a long-running process; a dead rule must not
+			// kill it, so the sentinel is swallowed here.
+			return nil
+		}
+		return ErrStrictFindings
 	}
 	return app.report.Dump()
 }

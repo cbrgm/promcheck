@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/alecthomas/kong"
@@ -31,4 +33,23 @@ func TestConfig_ConcurrencyDefaultAndDelayRemoved(t *testing.T) {
 	// --check.delay must no longer be accepted
 	_, err = parser.Parse([]string{"--check.delay", "0.5"})
 	require.Error(t, err)
+}
+
+func TestExitCodeFor(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"nil error completes ok", nil, exitOK},
+		{"strict findings", ErrStrictFindings, exitFindings},
+		{"wrapped strict findings", fmt.Errorf("check: %w", ErrStrictFindings), exitFindings},
+		{"no rule groups is a usage error", ErrNoRuleGroups, exitUsage},
+		{"generic error is a runtime failure", errors.New("boom"), exitRuntime},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, exitCodeFor(tt.err))
+		})
+	}
 }
