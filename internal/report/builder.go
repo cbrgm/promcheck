@@ -1,11 +1,13 @@
 package report
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"slices"
 
 	"github.com/fatih/color"
 	"gopkg.in/yaml.v3"
@@ -146,6 +148,20 @@ func (b *Builder) HasContent() bool {
 
 // finalize is called by format functions and calculates additional report data.
 func (b *Builder) finalize() {
+	// Sections are appended by concurrent probes upstream, so their order is
+	// non-deterministic across runs. Sort them so every output format (json,
+	// yaml, tree) renders the same way given the same input, which keeps CI
+	// diffs sane.
+	slices.SortFunc(b.Report.Sections, func(a, c Section) int {
+		if v := cmp.Compare(a.File, c.File); v != 0 {
+			return v
+		}
+		if v := cmp.Compare(a.Group, c.Group); v != 0 {
+			return v
+		}
+		return cmp.Compare(a.Name, c.Name)
+	})
+
 	totalSelectors := b.Report.TotalSelectorsFailed + b.Report.TotalSelectorsSuccess
 	if totalSelectors == 0 {
 		b.Report.RatioFailedTotal = 0

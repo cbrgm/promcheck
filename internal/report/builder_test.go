@@ -149,6 +149,42 @@ func TestReport_EmptySectionsMarshalAsEmptyArray(t *testing.T) {
 	require.Contains(t, yamlRaw, "results: []")
 }
 
+func TestFinalize_SortsSectionsDeterministically(t *testing.T) {
+	newScrambled := func() *Builder {
+		b := NewBuilder(WithWriter(io.Discard))
+		b.AddSection("c-file", "g", "z-rule", "vector(1)", nil, nil)
+		b.AddSection("a-file", "z-group", "r", "vector(1)", nil, nil)
+		b.AddSection("a-file", "a-group", "b-rule", "vector(1)", nil, nil)
+		b.AddSection("a-file", "a-group", "a-rule", "vector(1)", nil, nil)
+		b.AddSection("b-file", "g", "r", "vector(1)", nil, nil)
+		return b
+	}
+
+	b1 := newScrambled()
+	tree1, err := b1.ToTree()
+	require.NoError(t, err)
+
+	b2 := newScrambled()
+	tree2, err := b2.ToTree()
+	require.NoError(t, err)
+
+	require.Equal(t, tree1, tree2, "rendering the same scrambled input twice must produce identical output")
+
+	want := []struct{ file, group, name string }{
+		{"a-file", "a-group", "a-rule"},
+		{"a-file", "a-group", "b-rule"},
+		{"a-file", "z-group", "r"},
+		{"b-file", "g", "r"},
+		{"c-file", "g", "z-rule"},
+	}
+	require.Len(t, b1.Report.Sections, len(want))
+	for i, w := range want {
+		require.Equal(t, w.file, b1.Report.Sections[i].File, "section %d file", i)
+		require.Equal(t, w.group, b1.Report.Sections[i].Group, "section %d group", i)
+		require.Equal(t, w.name, b1.Report.Sections[i].Name, "section %d name", i)
+	}
+}
+
 func TestFinalize_ZeroSelectorsNoNaN(t *testing.T) {
 	b := NewBuilder(WithWriter(io.Discard))
 	// A rule with no selectors: TotalRules > 0, but total selectors == 0.

@@ -2,6 +2,7 @@ package report
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/fatih/color"
@@ -157,19 +158,26 @@ func (b *Builder) ToTree() (string, error) {
 		nodeMap[section.File][section.Group][section.Name] = results
 	}
 
-	// finally build the tree
+	// finally build the tree, walking the maps in sorted key order so the
+	// output is stable across runs (map iteration order is not).
 	root := newNode(".")
-	for file, groups := range nodeMap {
+	for _, file := range sortedKeys(nodeMap) {
+		groups := nodeMap[file]
+
 		// tree depth 1: files
 		prefixedFile := fmt.Sprintf("%s %s", color.YellowString("%s", "[file]"), file)
 		fileNode := newNode(prefixedFile)
 
-		for group, rules := range groups {
-			// tree depth 2: groups
-			group := fmt.Sprintf("%s %s", color.YellowString("%s", "[group]"), group)
-			groupNode := newNode(group)
+		for _, group := range sortedKeys(groups) {
+			rules := groups[group]
 
-			for rule, results := range rules {
+			// tree depth 2: groups
+			groupLabel := fmt.Sprintf("%s %s", color.YellowString("%s", "[group]"), group)
+			groupNode := newNode(groupLabel)
+
+			for _, rule := range sortedKeys(rules) {
+				results := rules[rule]
+
 				// tree depth 3: rules
 				prefixedRule := fmt.Sprintf(
 					"%s %s",
@@ -203,6 +211,17 @@ func (b *Builder) ToTree() (string, error) {
 	}
 
 	return root.Print() + b.addSummary(), nil
+}
+
+// sortedKeys returns the keys of m in sorted order, so callers can produce
+// deterministic output when iterating over a map.
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 func (b *Builder) addSummary() string {
