@@ -9,7 +9,7 @@ import (
 	"os"
 	"slices"
 
-	"github.com/fatih/color"
+	"github.com/mattn/go-isatty"
 	"gopkg.in/yaml.v3"
 
 	"github.com/cbrgm/promcheck/internal/metrics"
@@ -43,6 +43,13 @@ type Builder struct {
 
 	// metrics represents promcheck metrics
 	metrics metrics.Metrics
+
+	// useColor controls whether the tree renderer emits ANSI color codes.
+	useColor bool
+
+	// colorExplicit is true once WithColor/WithoutColor has been applied,
+	// so NewBuilder knows not to overwrite it with its own auto-detection.
+	colorExplicit bool
 }
 
 // NewBuilder returns a new Builder.
@@ -56,7 +63,23 @@ func NewBuilder(opts ...BuilderOption) *Builder {
 	for _, opt := range opts {
 		opt(b)
 	}
+	if !b.colorExplicit {
+		// Default: color only when writing to a real terminal and the user
+		// hasn't opted out via NO_COLOR (see no-color.org).
+		b.useColor = IsTTY(b.writer) && os.Getenv("NO_COLOR") == ""
+	}
 	return b
+}
+
+// IsTTY reports whether w is a terminal file descriptor. Writers that aren't
+// an *os.File (e.g. a bytes.Buffer used in tests, or a pipe) are never
+// considered a TTY.
+func IsTTY(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
 }
 
 // BuilderOption represents builder options.
@@ -71,8 +94,15 @@ func WithFormat(format string) BuilderOption {
 
 // WithoutColor passing this BuilderOption to the NewBuilder disables terminal color.
 func WithoutColor() BuilderOption {
+	return WithColor(false)
+}
+
+// WithColor explicitly enables or disables ANSI color codes in tree output,
+// overriding the Builder's own TTY/NO_COLOR auto-detection.
+func WithColor(enabled bool) BuilderOption {
 	return func(b *Builder) {
-		color.NoColor = true
+		b.useColor = enabled
+		b.colorExplicit = true
 	}
 }
 
