@@ -35,6 +35,17 @@ func TestConfig_ConcurrencyDefaultAndDelayRemoved(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestConfig_MetricsProfileAndRuntimeDefaultOff(t *testing.T) {
+	var cfg config
+	parser, err := kong.New(&cfg, kong.Name("promcheck"))
+	require.NoError(t, err)
+	_, err = parser.Parse(nil)
+	require.NoError(t, err)
+
+	require.False(t, cfg.ExporterEnableProfiling, "pprof profiling must be opt-in via --metrics.profile")
+	require.False(t, cfg.ExporterEnableRuntimeMetrics, "runtime metrics must be opt-in via --metrics.runtime")
+}
+
 func TestExitCodeFor(t *testing.T) {
 	tests := []struct {
 		name string
