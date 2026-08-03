@@ -331,6 +331,58 @@ func TestProbeSelector_HonorsContextCancellation(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
+// siblingCancelProber lets a test prove that an error from one rule's probe
+// cancels the derived context used by sibling probes in the same group. The
+// "err_metric" selector fails immediately; the "slow_metric" selector blocks
+// on ctx.Done() (falling back to a bounded timeout so the test can never hang
+// forever if cancellation is not wired) and records whether it observed
+// cancellation.
+type siblingCancelProber struct {
+	sawCancel chan struct{}
+}
+
+func (p *siblingCancelProber) ProbeSelector(ctx context.Context, selector string) (float64, error) {
+	switch selector {
+	case `err_metric{job="x"}`:
+		return 0, errors.New("boom")
+	case `slow_metric{job="y"}`:
+		select {
+		case <-ctx.Done():
+			close(p.sawCancel)
+			return 0, ctx.Err()
+		case <-time.After(2 * time.Second):
+			return 1, nil
+		}
+	default:
+		return 0, fmt.Errorf("unexpected selector %q", selector)
+	}
+}
+
+func TestCheckRuleGroup_CancelsSiblingsOnError(t *testing.T) {
+	p := &siblingCancelProber{sawCancel: make(chan struct{})}
+	prc := &PrometheusRulesChecker{probe: p, parser: promql.NewParser(promql.Options{})}
+	group := RuleGroup{
+		Name: "g",
+		Rules: []Rule{
+			{Name: "erroring", Expression: `err_metric{job="x"}`},
+			{Name: "slow", Expression: `slow_metric{job="y"}`},
+		},
+	}
+
+	_, err := prc.CheckRuleGroup(t.Context(), group)
+	require.Error(t, err)
+
+	// CheckRuleGroup only returns once eg.Wait() has joined every goroutine,
+	// including the slow one, so by now sawCancel is closed iff the slow
+	// probe actually observed context cancellation rather than hitting its
+	// 2s fallback timeout.
+	select {
+	case <-p.sawCancel:
+	default:
+		t.Fatal("sibling probe did not observe context cancellation after a sibling error")
+	}
+}
+
 func TestGetVectorSelectors_UTF8Names(t *testing.T) {
 	p := promql.NewParser(promql.Options{})
 	// dotted metric and label names require the quoted brace form
