@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"slices"
 	"sync"
+	"time"
 
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 
@@ -56,6 +57,11 @@ type RuleGroup struct {
 
 	// File represents the name of the rule group
 	File string `json:"file"`
+
+	// QueryOffset represents the group's query_offset, evaluating selectors
+	// against data this far in the past. Zero means no offset (evaluate at
+	// the current time).
+	QueryOffset time.Duration `json:"queryOffset,omitempty"`
 
 	// Rules represents a list of Rule
 	Rules []Rule `json:"rules"`
@@ -158,9 +164,18 @@ func (prc *PrometheusRulesChecker) CheckRuleGroup(ctx context.Context, group Rul
 		results = make([]CheckResult, 0, len(group.Rules))
 	)
 	eg, ctx := errgroup.WithContext(ctx)
+
+	// Compute the evaluation timestamp once per group so all of its selectors
+	// are probed at a consistent point in time, honoring the group's
+	// query_offset (if any) instead of always probing "now".
+	ts := time.Now()
+	if group.QueryOffset > 0 {
+		ts = ts.Add(-group.QueryOffset)
+	}
+
 	for _, rule := range group.Rules {
 		eg.Go(func() error {
-			success, failed, err := prc.probeSelectorResults(ctx, rule.Expression)
+			success, failed, err := prc.probeSelectorResults(ctx, ts, rule.Expression)
 			if err != nil {
 				return fmt.Errorf("rule %q: %w", rule.Name, err)
 			}
@@ -204,8 +219,9 @@ func isIgnored(patterns []*regexp.Regexp, s string) bool {
 }
 
 // probeSelectorResults probes the given PromQL expression string for selectors without a result value.
+// probeSelectorResults probes at the given evaluation timestamp ts.
 // probeSelectorResults returns a list of successful selectors and failed selectors.
-func (prc *PrometheusRulesChecker) probeSelectorResults(ctx context.Context, promqlExpression string) ([]string, []string, error) {
+func (prc *PrometheusRulesChecker) probeSelectorResults(ctx context.Context, ts time.Time, promqlExpression string) ([]string, []string, error) {
 	selectorsWithoutResult := []string{}
 	selectorsWithResult := []string{}
 
@@ -242,7 +258,7 @@ func (prc *PrometheusRulesChecker) probeSelectorResults(ctx context.Context, pro
 				return selectorsWithResult, selectorsWithoutResult, ctx.Err()
 			}
 		}
-		val, err := prc.probe.ProbeSelector(ctx, selector)
+		val, err := prc.probe.ProbeSelector(ctx, selector, ts)
 		if prc.sem != nil {
 			<-prc.sem
 		}
