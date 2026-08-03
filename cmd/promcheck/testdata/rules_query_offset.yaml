@@ -1,0 +1,6 @@
+groups:
+  - name: example
+    query_offset: 5m
+    rules:
+      - alert: HighLatency
+        expr: up{job="x"} > 0

@@ -297,6 +297,10 @@ func processFile(p promql.Parser, logger *slog.Logger, file string) ([]checker.R
 
 func rulefmtToPromcheck(fileName string, group rulefmt.RuleGroup) checker.RuleGroup {
 	out := checker.RuleGroup{Name: group.Name, File: fileName, Rules: make([]checker.Rule, 0, len(group.Rules))}
+	if group.QueryOffset != nil {
+		// model.Duration is a typedef of time.Duration.
+		out.QueryOffset = time.Duration(*group.QueryOffset)
+	}
 	for _, rule := range group.Rules {
 		name := cmp.Or(rule.Record, rule.Alert)
 		out.Rules = append(out.Rules, checker.Rule{Name: name, Expression: rule.Expr})

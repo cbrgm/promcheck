@@ -243,13 +243,17 @@ type fakeProber struct {
 	err error
 	// calls records every selector passed to ProbeSelector, in order
 	calls []string
+	// tsCalls records the evaluation timestamp passed to ProbeSelector for
+	// each call, in the same order as calls
+	tsCalls []time.Time
 }
 
-func (f *fakeProber) ProbeSelector(ctx context.Context, selector string) (float64, error) {
+func (f *fakeProber) ProbeSelector(ctx context.Context, selector string, ts time.Time) (float64, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
 	f.calls = append(f.calls, selector)
+	f.tsCalls = append(f.tsCalls, ts)
 	if f.err != nil {
 		return 0, f.err
 	}
@@ -263,7 +267,7 @@ func TestProbeSelectorResults_ContinuesAfterIgnoredMatcher(t *testing.T) {
 	prc := &PrometheusRulesChecker{probe: fp, parser: promql.NewParser(promql.Options{})}
 
 	// ALERTS{...} is ignored; up{job="x"} must still be probed.
-	success, failed, err := prc.probeSelectorResults(t.Context(), `ALERTS{alertname="Foo"} or up{job="x"}`)
+	success, failed, err := prc.probeSelectorResults(t.Context(), time.Now(), `ALERTS{alertname="Foo"} or up{job="x"}`)
 	require.NoError(t, err)
 	require.Contains(t, fp.calls, `up{job="x"}`, "selector after the ignored ALERTS selector must still be probed")
 	require.Equal(t, []string{`up{job="x"}`}, success)
@@ -281,6 +285,28 @@ func TestCheckRuleGroup_PropagatesProbeError(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestCheckRuleGroup_AppliesQueryOffset(t *testing.T) {
+	fp := &fakeProber{values: map[string]float64{`up{job="x"}`: 1}}
+	prc := &PrometheusRulesChecker{probe: fp, parser: promql.NewParser(promql.Options{})}
+	group := RuleGroup{
+		Name:        "g",
+		QueryOffset: 5 * time.Minute,
+		Rules:       []Rule{{Name: "r", Expression: `up{job="x"}`}},
+	}
+
+	before := time.Now()
+	_, err := prc.CheckRuleGroup(t.Context(), group)
+	after := time.Now()
+	require.NoError(t, err)
+
+	require.Len(t, fp.tsCalls, 1)
+	got := fp.tsCalls[0]
+	wantEarliest := before.Add(-group.QueryOffset).Add(-2 * time.Second)
+	wantLatest := after.Add(-group.QueryOffset).Add(2 * time.Second)
+	require.True(t, !got.Before(wantEarliest) && !got.After(wantLatest),
+		"probe ts %v not within tolerance of now-%v (want between %v and %v)", got, group.QueryOffset, wantEarliest, wantLatest)
+}
+
 // countingProber records the maximum number of ProbeSelector calls observed
 // running concurrently, using atomics so the test itself is race-free.
 type countingProber struct {
@@ -288,7 +314,7 @@ type countingProber struct {
 	max    atomic.Int64
 }
 
-func (c *countingProber) ProbeSelector(_ context.Context, _ string) (float64, error) {
+func (c *countingProber) ProbeSelector(_ context.Context, _ string, _ time.Time) (float64, error) {
 	n := c.active.Add(1)
 	for {
 		old := c.max.Load()
@@ -327,7 +353,7 @@ func TestProbeSelector_HonorsContextCancellation(t *testing.T) {
 	prc := &PrometheusRulesChecker{probe: fp, parser: promql.NewParser(promql.Options{})}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, _, err := prc.probeSelectorResults(ctx, `up{job="x"}`)
+	_, _, err := prc.probeSelectorResults(ctx, time.Now(), `up{job="x"}`)
 	require.ErrorIs(t, err, context.Canceled)
 }
 
@@ -341,7 +367,7 @@ type siblingCancelProber struct {
 	sawCancel chan struct{}
 }
 
-func (p *siblingCancelProber) ProbeSelector(ctx context.Context, selector string) (float64, error) {
+func (p *siblingCancelProber) ProbeSelector(ctx context.Context, selector string, _ time.Time) (float64, error) {
 	switch selector {
 	case `err_metric{job="x"}`:
 		return 0, errors.New("boom")
