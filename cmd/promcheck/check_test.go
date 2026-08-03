@@ -162,6 +162,23 @@ func TestRunCheck_StrictModeExitsOneShot(t *testing.T) {
 	require.Equal(t, 1, exitErr.ExitCode())
 }
 
+// TestRun_OneShotSignalContextDoesNotBreakNormalRuns verifies that wiring
+// checkRules through signal.NotifyContext in the one-shot path (so Ctrl-C
+// can abort in-flight probes) doesn't change behavior for a run that
+// completes normally without any signal being delivered.
+func TestRun_OneShotSignalContextDoesNotBreakNormalRuns(t *testing.T) {
+	rep := &fakeReporter{}
+	app := &promcheckApp{
+		check:                  &fakeChecker{res: []checker.CheckResult{{Name: "r", Results: []string{`up`}}}},
+		report:                 rep,
+		logger:                 newTestLogger(),
+		optInlineExpressions:   []string{"up"},
+		optExporterModeEnabled: false,
+	}
+	require.NoError(t, app.run())
+	require.True(t, rep.dumped)
+}
+
 func TestCheckRulesFromRuleFiles_EmptyReturnsError(t *testing.T) {
 	app := &promcheckApp{
 		optFilesRegexp: "testdata/does-not-match-*.yaml",

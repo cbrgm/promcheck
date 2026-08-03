@@ -8,9 +8,11 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/api"
@@ -152,7 +154,13 @@ func (app *promcheckApp) run() error {
 	if app.optExporterModeEnabled {
 		return app.runPromcheckExporter()
 	}
-	return app.checkRules(context.Background())
+
+	// One-shot runs otherwise have no way to react to Ctrl-C: without this,
+	// checkRules gets an uncancellable context and a SIGINT during a slow
+	// probe just kills the process outright instead of unwinding gracefully.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return app.checkRules(ctx)
 }
 
 func (app *promcheckApp) checkRules(ctx context.Context) error {
