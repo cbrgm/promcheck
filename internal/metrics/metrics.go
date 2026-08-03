@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -43,6 +44,10 @@ type Metrics interface {
 	SetRuleGroupsTotal(value float64)
 	SetRulesTotal(value float64)
 	SetSelectorsTotal(file, group, rule, status string, value float64)
+	SetBuildInfo(version, revision, goversion string)
+	SetLastRunTimestamp(t time.Time)
+	SetRunDuration(d time.Duration)
+	IncRunErrors()
 	RegisterHandler(path string, handler *http.ServeMux)
 }
 
