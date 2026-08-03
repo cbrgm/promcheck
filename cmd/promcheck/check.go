@@ -200,8 +200,8 @@ func (app *promcheckApp) runCheck(ctx context.Context, src ruleSource) error {
 	var (
 		mu           sync.Mutex
 		checkResults []checker.CheckResult
-		eg           errgroup.Group
 	)
+	eg, ctx := errgroup.WithContext(ctx)
 
 	// The outer fan-out over groups is unbounded; total probe concurrency is
 	// bounded inside the checker (see PrometheusRulesCheckerConfig.MaxConcurrency).

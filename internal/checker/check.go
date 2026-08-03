@@ -156,8 +156,8 @@ func (prc *PrometheusRulesChecker) CheckRuleGroup(ctx context.Context, group Rul
 	var (
 		mu      sync.Mutex
 		results = make([]CheckResult, 0, len(group.Rules))
-		eg      errgroup.Group
 	)
+	eg, ctx := errgroup.WithContext(ctx)
 	for _, rule := range group.Rules {
 		eg.Go(func() error {
 			success, failed, err := prc.probeSelectorResults(ctx, rule.Expression)
