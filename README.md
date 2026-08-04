@@ -44,6 +44,7 @@ referenced selectors out of it and probes them against a remote Prometheus insta
 * [Configuration](#configuration)
     + [Usage Information](#usage-information)
     + [CI/CD Usage](#cicd-usage)
+        - [Exit codes](#exit-codes)
     + [Output Formats](#output-formats)
 * [Container Usage](#container-usage)
 * [Kubernetes Deployment](#kubernetes-deployment)
@@ -186,6 +187,7 @@ Flags:
       --check.match=CHECK.MATCH,...                        PromQL label matchers to filter rules server-side, e.g. '{team="infra"}'
       --output.format="graph"                              The output format to use
       --output.no-color                                    Toggle colored output
+      --output.only-failing                                Only show rules that have selectors without results
       --exporter.enabled                                   Run promcheck as a prometheus exporter
       --exporter.addr="0.0.0.0:9093"                       The address the http server is running at
       --exporter.interval=300                              Delay in seconds between promcheck runs
@@ -197,7 +199,9 @@ Flags:
       --strict                                             Tell promcheck to exit with an error code on expressions without results
 ```
 
-`promcheck` uses 256 colors terminal mode. On 'nix OS system make sure the `TERM` environment variable is set.
+`--metrics.profile` (pprof profiling) and `--metrics.runtime` (Go runtime metrics) are opt-in and default to `false`. Enable them explicitly if you want that data exposed alongside the exporter's regular metrics.
+
+Colored output is used only when stdout is a real terminal. It's disabled automatically when stdout is piped or redirected, when the `NO_COLOR` environment variable is set (see [no-color.org](https://no-color.org/)), or when `--output.no-color` is passed. `promcheck` uses 256 colors terminal mode, so on 'nix OS make sure the `TERM` environment variable is set for colors to render correctly.
 
 ```bash
 export TERM=xterm-256color
@@ -210,11 +214,28 @@ intentionally do not return a result value.
 
 `promcheck` does a single HTTP request per vector selector to be probed against the remote Prometheus instance. With many rules to validate, this can add up to a lot of HTTP requests. The `--check.concurrency` flag (default `8`) bounds how many of these probes run in parallel: a higher value finishes faster but puts more concurrent load on Prometheus, a lower value is gentler on Prometheus but increases the runtime of the tool.
 
+When checking rule files (`--check.file`), `promcheck` honors a rule group's `query_offset`: selectors in that group are probed against data from `now - query_offset` instead of `now`. This cuts down on false "no result" findings for groups that intentionally evaluate against slightly delayed data (e.g. remote-write or otherwise late-arriving metrics). The live-instance mode (querying `/api/v1/rules` directly) always probes at `now`, since the Prometheus rules API doesn't expose a group's `query_offset`.
+
+Use `--output.only-failing` to restrict the output (any format) to rules that have at least one selector without a result. The summary totals (`groups_total`, `rules_total`, etc.) still reflect the full run.
+
 ### CI/CD Usage
 
 `promcheck` has a flag `--strict`, which causes `promcheck` to terminate with error code `1` after a successful run if expressions without a result value were found.
 
 Therefore, `--strict` should be used, depending on the use case whether `promcheck` should fail the report step during a CI/CD workflow in case of expressions without a result, or whether the step should run successfully regardless of whether expressions have results or not.
+
+#### Exit codes
+
+`promcheck` exits with one of the following codes, which scripts and CI pipelines can rely on:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Completed, no findings (or a non-strict run) |
+| `1` | `--strict` was set and one or more selectors had no results |
+| `2` | Configuration error: an invalid `--check.ignore-selector`/`--check.ignore-group` regexp, or nothing to check (e.g. an empty rule set, or `--check.file` matched no files) |
+| `3` | Runtime failure while probing: connection, query, or parse error |
+
+An unrecognized flag or an invalid flag value (e.g. `--output.format=csv`) is rejected by the flag parser itself, before this contract applies, and doesn't use any of the codes above.
 
 ### Output formats
 
@@ -256,6 +277,15 @@ docker run --rm -p 9093:9093 ghcr.io/cbrgm/promcheck:latest --prometheus.url='ht
   * `group` - The rule group name
   * `rule` - The rule name
   * `status` - The status `failed` or `success`
+* `promcheck_build_info` - (Gauge) Build metadata, value is always `1`. Label selectors:
+  * `version` - The `promcheck` version
+  * `revision` - The commit the binary was built from
+  * `goversion` - The Go version the binary was built with
+* `promcheck_last_run_timestamp_seconds` - (Gauge) Unix timestamp of the last completed check cycle.
+* `promcheck_run_duration_seconds` - (Gauge) Duration of the last check cycle, in seconds.
+* `promcheck_run_errors_total` - (Counter) Total number of check cycles that returned an error.
+
+`--metrics.prefix` replaces the `promcheck` namespace on all of the metric names above (existing and new) if set. A failed check cycle no longer tears down the exporter: it's logged, `promcheck_run_errors_total` is incremented, and the exporter keeps running on its normal interval.
 
 **Here are some basic examples**:
 
@@ -483,12 +513,14 @@ Output json:
     ],
     "groups_total": 2,
     "rules_total": 3,
-    "selectors_success_total": 3,
     "selectors_failed_total": 1,
+    "selectors_success_total": 3,
     "ratio_failed_total": 25
   }
 }
 ```
+
+`groups_total`, `rules_total`, `selectors_failed_total`, `selectors_success_total`, `ratio_failed_total` and `results` are always present in json/yaml output, even when their value is zero or an empty list. Older versions of `promcheck` omitted zero-valued fields, so scripts that used to check for a field's absence should check its value instead.
 
 ## Contributing & License
 
