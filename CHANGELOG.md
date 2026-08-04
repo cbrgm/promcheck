@@ -41,7 +41,7 @@ All notable changes to this project are documented in this file.
 * Exit codes are now a documented, stable contract instead of always exiting `1` on any failure:
   * `0` - completed, no findings (or a non-strict run)
   * `1` - `--strict` was set and one or more selectors had no results
-  * `2` - configuration error (invalid `--check.ignore-selector`/`--check.ignore-group` regexp, or nothing to check)
+  * `2` - configuration error (invalid `--check.ignore-selector`/`--check.ignore-group` regexp, nothing to check, or an invalid flag)
   * `3` - runtime failure while probing (connection, query, or parse error)
 
 ### Migrating from v1

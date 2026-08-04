@@ -232,10 +232,8 @@ Therefore, `--strict` should be used, depending on the use case whether `promche
 |------|---------|
 | `0` | Completed, no findings (or a non-strict run) |
 | `1` | `--strict` was set and one or more selectors had no results |
-| `2` | Configuration error: an invalid `--check.ignore-selector`/`--check.ignore-group` regexp, or nothing to check (e.g. an empty rule set, or `--check.file` matched no files) |
+| `2` | Usage error: an unrecognized flag, an invalid flag value (e.g. `--output.format=csv`), an invalid `--check.ignore-selector`/`--check.ignore-group` regexp, or nothing to check (e.g. an empty rule set, or `--check.file` matched no files) |
 | `3` | Runtime failure while probing: connection, query, or parse error |
-
-An unrecognized flag or an invalid flag value (e.g. `--output.format=csv`) is rejected by the flag parser itself, before this contract applies, and doesn't use any of the codes above.
 
 ### Output formats
 

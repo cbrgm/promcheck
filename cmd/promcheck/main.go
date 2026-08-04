@@ -92,6 +92,16 @@ func main() {
 				GoVersion,
 			),
 		),
+		// kong handles its own flag-parsing errors (unknown flag, invalid
+		// enum value, etc.) and exits before runMain ever runs. Route those
+		// exits through our documented contract: --help must still exit 0,
+		// but any other kong-driven exit becomes exitUsage.
+		kong.Exit(func(code int) {
+			if code != 0 {
+				code = exitUsage
+			}
+			os.Exit(code)
+		}),
 	)
 
 	logger := newLogger(cfg.LogJSON, cfg.LogLevel)
