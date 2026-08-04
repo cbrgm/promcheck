@@ -112,6 +112,7 @@ func newPromcheck(config *config, logger *slog.Logger) (*promcheckApp, error) {
 		EnableRuntimeMetrics: config.ExporterEnableRuntimeMetrics,
 		PrometheusRegistry:   nil,
 	})
+	promMetrics.SetBuildInfo(Version, Revision, GoVersion)
 
 	// Color only when writing to a real terminal, NO_COLOR isn't set (see
 	// no-color.org), and the user didn't pass --output.no-color.
