@@ -68,8 +68,16 @@ func (app *promcheckApp) runPromcheckExporter() error {
 					return nil
 				case <-tick.C:
 					app.logger.Info("executing promcheck routine")
-					if err := app.checkRules(ctx); err != nil {
-						return err
+					start := time.Now()
+					err := app.checkRules(ctx)
+					app.metrics.SetRunDuration(time.Since(start))
+					app.metrics.SetLastRunTimestamp(time.Now())
+					if err != nil {
+						app.metrics.IncRunErrors()
+						// The exporter is a long-running process; a transient
+						// probe failure must not tear it down, so we log and
+						// keep ticking instead of returning the error.
+						app.logger.Error("promcheck routine failed", "err", err)
 					}
 				}
 			}
