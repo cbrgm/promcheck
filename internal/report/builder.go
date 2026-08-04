@@ -194,15 +194,18 @@ func (b *Builder) finalize() {
 	// Sections are appended by concurrent probes upstream, so their order is
 	// non-deterministic across runs. Sort them so every output format (json,
 	// yaml, tree) renders the same way given the same input, which keeps CI
-	// diffs sane.
+	// diffs sane. Expression is included as a final tiebreaker: two sections
+	// can legally share the same (File, Group, Name) — e.g. two alerts named
+	// "HighLatency" in the same group at different severities — and without
+	// a total sort key, their relative order would depend on the
+	// non-deterministic pre-sort order.
 	slices.SortFunc(b.Report.Sections, func(a, c Section) int {
-		if v := cmp.Compare(a.File, c.File); v != 0 {
-			return v
-		}
-		if v := cmp.Compare(a.Group, c.Group); v != 0 {
-			return v
-		}
-		return cmp.Compare(a.Name, c.Name)
+		return cmp.Or(
+			cmp.Compare(a.File, c.File),
+			cmp.Compare(a.Group, c.Group),
+			cmp.Compare(a.Name, c.Name),
+			cmp.Compare(a.Expression, c.Expression),
+		)
 	})
 
 	totalSelectors := b.Report.TotalSelectorsFailed + b.Report.TotalSelectorsSuccess

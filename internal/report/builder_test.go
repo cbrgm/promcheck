@@ -185,6 +185,33 @@ func TestFinalize_SortsSectionsDeterministically(t *testing.T) {
 	}
 }
 
+func TestFinalize_TiebreaksIdenticalFileGroupNameByExpression(t *testing.T) {
+	// Two sections sharing the same File/Group/Name is legal (e.g. two
+	// "HighLatency" alerts in the same group at different severities), so
+	// Expression must serve as the final tiebreaker to keep output
+	// deterministic across runs regardless of insertion order.
+	newScrambled := func(firstExpr, secondExpr string) *Builder {
+		b := NewBuilder(WithWriter(io.Discard))
+		b.AddSection("f", "g", "HighLatency", firstExpr, nil, nil)
+		b.AddSection("f", "g", "HighLatency", secondExpr, nil, nil)
+		return b
+	}
+
+	b1 := newScrambled(`severity="warning"`, `severity="critical"`)
+	json1, err := b1.ToJSON()
+	require.NoError(t, err)
+
+	b2 := newScrambled(`severity="critical"`, `severity="warning"`)
+	json2, err := b2.ToJSON()
+	require.NoError(t, err)
+
+	require.Equal(t, json1, json2, "identical sections inserted in scrambled order must produce identical JSON")
+
+	require.Len(t, b1.Report.Sections, 2)
+	require.Equal(t, `severity="critical"`, b1.Report.Sections[0].Expression)
+	require.Equal(t, `severity="warning"`, b1.Report.Sections[1].Expression)
+}
+
 // ansiEscape is present in fatih/color output whenever colorization is active.
 const ansiEscape = "\x1b["
 
