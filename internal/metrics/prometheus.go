@@ -72,13 +72,13 @@ func NewPrometheus(opts Options) *Prometheus {
 	lastRunTimestamp := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "last_run_timestamp_seconds",
-		Help:      "Unix timestamp of the last completed check cycle.",
+		Help:      "Unix timestamp of the last check run.",
 	})
 
 	runDuration := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "run_duration_seconds",
-		Help:      "Duration of the last check cycle in seconds.",
+		Help:      "Duration of the last check run in seconds.",
 	})
 
 	runErrorsTotal := prometheus.NewCounter(prometheus.CounterOpts{
