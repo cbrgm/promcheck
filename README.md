@@ -279,8 +279,8 @@ docker run --rm -p 9093:9093 ghcr.io/cbrgm/promcheck:latest --prometheus.url='ht
   * `version` - The `promcheck` version
   * `revision` - The commit the binary was built from
   * `goversion` - The Go version the binary was built with
-* `promcheck_last_run_timestamp_seconds` - (Gauge) Unix timestamp of the last completed check cycle.
-* `promcheck_run_duration_seconds` - (Gauge) Duration of the last check cycle, in seconds.
+* `promcheck_last_run_timestamp_seconds` - (Gauge) Unix timestamp of the last check run.
+* `promcheck_run_duration_seconds` - (Gauge) Duration of the last check run, in seconds.
 * `promcheck_run_errors_total` - (Counter) Total number of check cycles that returned an error.
 
 `--metrics.prefix` replaces the `promcheck` namespace on all of the metric names above (existing and new) if set. A failed check cycle no longer tears down the exporter: it's logged, `promcheck_run_errors_total` is incremented, and the exporter keeps running on its normal interval.
