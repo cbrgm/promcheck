@@ -358,34 +358,46 @@ func TestProbeSelector_HonorsContextCancellation(t *testing.T) {
 }
 
 // siblingCancelProber lets a test prove that an error from one rule's probe
-// cancels the derived context used by sibling probes in the same group. The
-// "err_metric" selector fails immediately; the "slow_metric" selector blocks
-// on ctx.Done() (falling back to a bounded timeout so the test can never hang
-// forever if cancellation is not wired) and records whether it observed
-// cancellation.
+// cancels the derived context used by sibling probes in the same group.
+// probeSelectorResults checks ctx.Err() at the top of its selector loop,
+// before calling ProbeSelector, so if the erroring probe cancels ctx before
+// the sibling goroutine reaches ProbeSelector, that goroutine would
+// short-circuit at the loop guard and never observe cancellation inside
+// ProbeSelector. To make the observation deterministic, the "err_metric"
+// selector withholds its error until the "slow_metric" selector confirms
+// (via slowStarted) that it is parked on ctx.Done() inside ProbeSelector;
+// only then does cancellation propagate, so it is always observed at the
+// ProbeSelector level.
 type siblingCancelProber struct {
-	sawCancel chan struct{}
+	slowStarted chan struct{} // closed once the slow probe is parked on ctx.Done()
+	sawCancel   chan struct{} // closed once the slow probe observes cancellation
 }
 
 func (p *siblingCancelProber) ProbeSelector(ctx context.Context, selector string, _ time.Time) (float64, error) {
 	switch selector {
 	case `err_metric{job="x"}`:
+		// Don't error until the slow probe is actually parked on ctx.Done(),
+		// so the cancellation it triggers is observed deterministically.
+		select {
+		case <-p.slowStarted:
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		}
 		return 0, errors.New("boom")
 	case `slow_metric{job="y"}`:
-		select {
-		case <-ctx.Done():
-			close(p.sawCancel)
-			return 0, ctx.Err()
-		case <-time.After(2 * time.Second):
-			return 1, nil
-		}
+		close(p.slowStarted)
+		<-ctx.Done() // released only by cancellation (no timeout fallback)
+		close(p.sawCancel)
+		return 0, ctx.Err()
 	default:
 		return 0, fmt.Errorf("unexpected selector %q", selector)
 	}
 }
 
 func TestCheckRuleGroup_CancelsSiblingsOnError(t *testing.T) {
-	p := &siblingCancelProber{sawCancel: make(chan struct{})}
+	p := &siblingCancelProber{slowStarted: make(chan struct{}), sawCancel: make(chan struct{})}
+	// No sem (MaxConcurrency unset) so both rules probe concurrently; a
+	// MaxConcurrency of 1 would serialize them and deadlock this design.
 	prc := &PrometheusRulesChecker{probe: p, parser: promql.NewParser(promql.Options{})}
 	group := RuleGroup{
 		Name: "g",
@@ -395,17 +407,25 @@ func TestCheckRuleGroup_CancelsSiblingsOnError(t *testing.T) {
 		},
 	}
 
-	_, err := prc.CheckRuleGroup(t.Context(), group)
-	require.Error(t, err)
+	// Bound the wait so a regression (broken cancellation, leaving the slow
+	// probe blocked forever) fails the test instead of hanging.
+	done := make(chan error, 1)
+	go func() {
+		_, e := prc.CheckRuleGroup(t.Context(), group)
+		done <- e
+	}()
 
-	// CheckRuleGroup only returns once eg.Wait() has joined every goroutine,
-	// including the slow one, so by now sawCancel is closed iff the slow
-	// probe actually observed context cancellation rather than hitting its
-	// 2s fallback timeout.
+	select {
+	case err := <-done:
+		require.Error(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("CheckRuleGroup did not return; sibling cancellation likely broken")
+	}
+
 	select {
 	case <-p.sawCancel:
 	default:
-		t.Fatal("sibling probe did not observe context cancellation after a sibling error")
+		t.Fatal("sibling probe did not observe context cancellation")
 	}
 }
 
