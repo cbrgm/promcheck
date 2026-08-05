@@ -139,23 +139,6 @@ func compilePatterns(patterns []string) ([]*regexp.Regexp, error) {
 	return compiled, nil
 }
 
-// CheckRuleGroups checks Prometheus rule groups.
-// CheckRuleGroups returns a list of CheckResult.
-func (prc *PrometheusRulesChecker) CheckRuleGroups(ctx context.Context, groups []RuleGroup) ([]CheckResult, error) {
-	results := []CheckResult{}
-	for _, g := range groups {
-		if isIgnoredGroup(prc.ignoredGroupsRegexp, g.Name) {
-			continue
-		}
-		res, err := prc.CheckRuleGroup(ctx, g)
-		if err != nil {
-			return results, err
-		}
-		results = append(results, res...)
-	}
-	return results, nil
-}
-
 // CheckRuleGroup checks a single rule group.
 // CheckRuleGroup returns a list of CheckResult.
 func (prc *PrometheusRulesChecker) CheckRuleGroup(ctx context.Context, group RuleGroup) ([]CheckResult, error) {
