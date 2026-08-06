@@ -271,7 +271,7 @@ func (app *promcheckApp) checkRulesFromPrometheusInstance() error {
 		return err
 	}
 	promAPI := prometheusv1.NewAPI(client)
-	apiResponse, err := promAPI.Rules(context.TODO()) // TODO: Can we somehow only load the ones we're interested in if filtered?
+	apiResponse, err := promAPI.Rules(context.TODO(), nil) // TODO: Can we somehow only load the ones we're interested in if filtered?
 	if err != nil {
 		// nolint: errcheck
 		level.Error(app.logger).Log("msg", "failed to receive rules from prometheus instance", "err", err)
