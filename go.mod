@@ -5,7 +5,7 @@ go 1.26.5
 require (
 	github.com/alecthomas/kong v1.16.0
 	github.com/fatih/color v1.19.0
-	github.com/mattn/go-isatty v0.0.20
+	github.com/mattn/go-isatty v0.0.24
 	github.com/oklog/run v1.2.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/common v0.70.1
