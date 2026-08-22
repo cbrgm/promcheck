@@ -31,7 +31,7 @@ ifndef VERSION
 	ifeq ($(GITHUB_REF_TYPE), tag)
 		VERSION ?= $(subst v,,$(GITHUB_REF_NAME))
 	else
-		VERSION ?= $(shell git describe --tags --abbrev=0)-dirty
+		VERSION ?= $(shell git describe --tags --dirty 2>/dev/null || echo dev)
 	endif
 endif
 
