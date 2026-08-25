@@ -21,7 +21,7 @@ TAGS ?=
 
 ifndef OUTPUT
 	ifeq ($(GITHUB_REF_TYPE), tag)
-		OUTPUT ?= $(subst v,,$(GITHUB_REF_NAME))
+		OUTPUT ?= $(patsubst v%,%,$(GITHUB_REF_NAME))
 	else
 		OUTPUT ?= testing
 	endif
@@ -29,9 +29,9 @@ endif
 
 ifndef VERSION
 	ifeq ($(GITHUB_REF_TYPE), tag)
-		VERSION ?= $(subst v,,$(GITHUB_REF_NAME))
+		VERSION ?= $(patsubst v%,%,$(GITHUB_REF_NAME))
 	else
-		VERSION ?= $(shell git describe --tags --dirty 2>/dev/null || echo dev)
+		VERSION ?= $(patsubst v%,%,$(shell git describe --tags --dirty 2>/dev/null || echo dev))
 	endif
 endif
 
@@ -77,6 +77,16 @@ generate:
 .PHONY: test
 test:
 	go test -coverprofile coverage.out $(PACKAGES)
+
+# Prints the release notes for the most recent tag, using the same invocation
+# the go-binaries workflow publishes with. Run `make changelog CLIFF_ARGS=--unreleased`
+# to preview the notes for the commits since that tag instead.
+CLIFF_ARGS ?= --latest
+
+.PHONY: changelog
+changelog:
+	@command -v git-cliff >/dev/null 2>&1 || { echo "git-cliff not installed: https://git-cliff.org/docs/installation" >&2; exit 1; }
+	@git-cliff --config cliff.toml $(CLIFF_ARGS) --strip all
 
 .PHONY: install
 install: $(SOURCES)
