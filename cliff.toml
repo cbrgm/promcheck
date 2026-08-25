@@ -1,0 +1,105 @@
+# git-cliff ~ configuration file
+# https://git-cliff.org/docs/configuration
+#
+# Rendered as GitHub release notes by .github/workflows/go-binaries.yml:
+#
+#   git-cliff --latest --strip all
+#
+# `--strip all` drops the header and footer, so `body` below is the entire
+# release body. The `[remote.github]` owner/repo pair is supplied by the
+# workflow through the GITHUB_REPO environment variable, which is what lets
+# the template resolve pull request links and first-time contributors.
+
+[changelog]
+# Each entry renders `commit.message` rather than `commit.remote.pr_title`. On a
+# squash merge the two carry the same text, but the PR title keeps its raw
+# `type(scope):` prefix, which would then print twice: once as the scope and
+# again inside the subject.
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits %}
+        - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
+            {% if commit.breaking %}[**breaking**] {% endif %}\
+            {{ commit.message | split(pat="\n") | first | trim | upper_first }}\
+            {% if commit.remote.username %} by @{{ commit.remote.username }}{% endif %}\
+            {% if commit.remote.pr_number %} in [#{{ commit.remote.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.remote.pr_number }}){% endif %}\
+    {% endfor %}
+{% endfor %}
+{%- if github -%}
+{% if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}
+    ### New Contributors
+    {% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
+        - @{{ contributor.username }} made their first contribution\
+            {% if contributor.pr_number %} in [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}){% endif %}\
+    {% endfor %}
+{% endif %}
+{%- endif %}
+{%- if version and previous.version %}
+    **Full Changelog**: {{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }}
+{% endif %}
+{%- macro remote_url() -%}
+    https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
+"""
+# Remove leading and trailing whitespace from every line of the body.
+trim = true
+
+[git]
+# Parse commits according to the conventional commits specification.
+# See https://www.conventionalcommits.org
+conventional_commits = true
+# Keep commits that do not follow the specification rather than dropping them
+# silently; the catch-all parser below files them under "Other".
+filter_unconventional = false
+split_commits = false
+commit_preprocessors = [
+    # Strip the trailing "(#123)" GitHub adds on squash merges; the pull
+    # request link is rendered from the remote integration instead.
+    { pattern = '(?m)\s*\((\w+\s)?#([0-9]+)\)$', replace = "" },
+]
+# Never let a parser skip a breaking change.
+protect_breaking_commits = true
+# The `<!-- NN -->` prefixes only exist to order the groups; `striptags` in the
+# body template removes them before rendering. They must stay zero-padded:
+# `group_by` sorts the raw string, so an unpadded `<!-- 4 -->` would sort after
+# `<!-- 10 -->`.
+commit_parsers = [
+    # Merge commits restate whatever they merged. Keeping them would list every
+    # change twice: once from the real commit and once from the merge.
+    { message = "^Merge ", skip = true },
+    { message = "^feat", group = "<!-- 00 -->Features" },
+    { message = "^fix", group = "<!-- 01 -->Bug Fixes" },
+    { message = "^perf", group = "<!-- 02 -->Performance" },
+    { message = "^refactor", group = "<!-- 03 -->Refactor" },
+    { message = "^doc", group = "<!-- 04 -->Documentation" },
+    { message = "^test", group = "<!-- 05 -->Testing" },
+    { message = "^style", group = "<!-- 06 -->Styling" },
+    { message = "^revert", group = "<!-- 07 -->Revert" },
+    { body = ".*security", group = "<!-- 08 -->Security" },
+    # Release plumbing, which describes no user-visible change.
+    { message = "^chore\\(release\\)", skip = true },
+    { message = "^chore\\(pr\\)", skip = true },
+    { message = "^chore\\(pull\\)", skip = true },
+    # Renovate output lands in Miscellaneous Tasks alongside other chores. The
+    # shared preset (github>cbrgm/cbrgm//renovate/preset) emits `chore(deps)`
+    # and `ci(tools)`, both of which the generic rule below already catches;
+    # the legacy forms still present in history do not, so they are listed
+    # explicitly to keep them out of "Other".
+    { message = "^(patch|minor|major)\\(deps", group = "<!-- 09 -->Miscellaneous Tasks" },
+    { message = "^deps\\(", group = "<!-- 09 -->Miscellaneous Tasks" },
+    { message = "^chore|^build|^ci", group = "<!-- 09 -->Miscellaneous Tasks" },
+    { message = ".*", group = "<!-- 10 -->Other" },
+]
+filter_commits = false
+fail_on_unmatched_commit = false
+# Only full semver tags count as releases. semver-tag-sync-action maintains
+# moving `v1` and `v1.2` tags that point at the same commit as the patch
+# release, and without this git-cliff may pick one of them as the previous
+# release and emit a `v1.2...v1.2.4` compare link. Matches prereleases
+# (`v1.2.3-alpha.0`) too.
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+"
+use_branch_tags = false
+topo_order = false
+sort_commits = "oldest"
+recurse_submodules = false
