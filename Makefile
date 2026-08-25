@@ -83,10 +83,22 @@ test:
 # to preview the notes for the commits since that tag instead.
 CLIFF_ARGS ?= --latest
 
+# git-cliff queries the GitHub API to resolve pull request links and first-time
+# contributors, and aborts outright once the unauthenticated quota (60 requests
+# per hour) runs out. The workflow supplies a token of its own, so this only
+# affects local runs: prefer an exported GITHUB_TOKEN, otherwise borrow the one
+# the gh CLI already holds.
 .PHONY: changelog
 changelog:
 	@command -v git-cliff >/dev/null 2>&1 || { echo "git-cliff not installed: https://git-cliff.org/docs/installation" >&2; exit 1; }
-	@git-cliff --config cliff.toml $(CLIFF_ARGS) --strip all
+	@token="$${GITHUB_TOKEN:-$$(gh auth token 2>/dev/null)}"; \
+	if [ -n "$$token" ]; then \
+		export GITHUB_TOKEN="$$token"; \
+	else \
+		echo "warning: no GITHUB_TOKEN and no gh login; the unauthenticated rate limit (60/hour) may abort this run" >&2; \
+		unset GITHUB_TOKEN; \
+	fi; \
+	git-cliff --config cliff.toml $(CLIFF_ARGS) --strip all
 
 .PHONY: install
 install: $(SOURCES)
