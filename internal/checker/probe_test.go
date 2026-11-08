@@ -20,9 +20,9 @@ type fakeAPI struct {
 	gotTS time.Time
 }
 
-func (f *fakeAPI) Query(_ context.Context, _ string, ts time.Time, _ ...prometheusv1.Option) (model.Value, prometheusv1.Warnings, error) {
+func (f *fakeAPI) Query(_ context.Context, _ string, ts time.Time, _ ...prometheusv1.Option) (model.Value, prometheusv1.Warnings, prometheusv1.Infos, error) {
 	f.gotTS = ts
-	return f.value, f.warnings, f.err
+	return f.value, f.warnings, nil, f.err
 }
 
 func TestProbe_NonVectorResultReturnsError(t *testing.T) {

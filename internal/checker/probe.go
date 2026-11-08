@@ -30,7 +30,7 @@ func newPrometheusProbe(prometheusURL string, client prometheusv1.API) Prober {
 
 func (p *prometheusProbe) probe(ctx context.Context, selector string, ts time.Time) (float64, error) {
 	query := fmt.Sprintf("count(%s)", selector)
-	value, _, err := p.api.Query(ctx, query, ts)
+	value, _, _, err := p.api.Query(ctx, query, ts)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query metrics: %w", err)
 	}
